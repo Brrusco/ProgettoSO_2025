@@ -1,14 +1,14 @@
 CC=gcc
 CFLAGS=-Wall -std=gnu99
-INCLUDES=-I./inc
+INCLUDES=-I./lib
 
 SERVER_SRCS=src/errExit.c src/server.c
 CLIENT_SRCS=src/errExit.c src/client.c
 BIN_DIR=bin/
 OBJ_DIR=obj/
 
-SERVER_OBJS=$(OBJ_DIR)server.o
-CLIENT_OBJS=$(OBJ_DIR)client.o
+SERVER_OBJS=$(OBJ_DIR)server.o $(OBJ_DIR)errExit.o
+CLIENT_OBJS=$(OBJ_DIR)client.o $(OBJ_DIR)errExit.o
 
 all: $(BIN_DIR)server $(BIN_DIR)client
 

@@ -1,8 +1,8 @@
 # Todo List Progetto SOP
 
-- [ ] creare Server e Client che si parlano tra di loro con FIFO
+- [x] creare Server e Client che si parlano tra di loro con FIFO
 - [ ] creare meccanismo di generazione SHA
-- [ ] Istanzpiu thread server per gestire richieste client multiple in parallelo (limitati)
+- [ ] Istanzia piu thread server per gestire richieste client multiple in parallelo (limitati)
 - [ ] Scheduling in ordine di dimensione file (prima il più piccolo variabile)
 - [ ] Limitare il numero massimo di thread eseguibili server 
 - [ ] Caching a memoria delle coppie PathFile / ImprontaSHA per restuituzione diretta in caso di richieste uguali ripetute

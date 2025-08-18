@@ -1,46 +1,76 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 #include "errExit.h"
 
 #define LEN 256
 
 
-
 int main(int argc, char *argv[]) {
-
-
-
-
     printf("hello world Server\n");
 
-    char *path2ServerFIFO = "/tmp/myfifo";
-    if (mkfifo(path2ServerFIFO, S_IRUSR | S_IWUSR | S_IWGRP) == -1)
-        errExit("mkfifo failed");
+    char *path2ServerFIFO = "./obj/serverFIFO";
+    char *path2ClientFIFO = "./obj/clientFIFO";
+    int bufferLettura;
+    char clientMessage[LEN];
 
-    printf("<Server> FIFO %s created!\n", path2ServerFIFO);
+    // [01] Crea fd per FIFO
+    if (mkfifo(path2ServerFIFO, S_IRUSR | S_IWUSR | S_IWGRP) == -1) {
+        if (errno != EEXIST)
+            errExit("mkfifo failed");
+        else
+            printf("<Server> FIFO %s already exists, using it.\n", path2ServerFIFO);
+    }
+    else
+        printf("<Server> FIFO %s creata!\n", path2ServerFIFO);
 
-    // Opening for reading only
+    // [02] Opening the server FIFO in read-only mode
+    printf("<Server> Attendo il client...\n");
     int serverFIFO = open(path2ServerFIFO, O_RDONLY);
     if (serverFIFO == -1)
+        errExit("open serverFIFO failed");
+    else
+        printf("<Server> Aspettando la path del file...\n");
+
+
+    // [03] Lettura e stampa della FIFO
+    bufferLettura = read(serverFIFO, &clientMessage[0], sizeof(clientMessage));
+    if (bufferLettura == -1) {
+        printf("<Server> it looks like the FIFO is broken\n");
+    } else if (bufferLettura != sizeof(clientMessage) || bufferLettura == 0)
+        printf("<Server> Messaggio ricevuto non va\n");
+    else
+        printf("<Server> ClientMSG: %s\n", clientMessage);
+
+
+    // [04] Open the FIFO created by Client in write-only mode
+    int clientFIFO = open(path2ClientFIFO, O_WRONLY);
+    if (clientFIFO == -1)
         errExit("open failed");
 
-    char filePath[LEN];
-    printf("<Server> waiting for vector [a,b]...\n");
-    // Reading 2 integers from the FIFO.
-    int bufferLettura = read(serverFIFO, &filePath[0], sizeof(filePath));
+    // [05] Mando al Client la conferma di ricevuta messaggio
+    char serverMessage[2*LEN];
+    strcat(serverMessage, clientMessage);  // Concatena str2 a str1
+    printf("<Server> inviando la risposta : %s\n", serverMessage);
+    if (write(clientFIFO, &serverMessage[0], sizeof(serverMessage)) != sizeof(serverMessage))
+        errExit("write failed");
     
-    // Printing buffer on stdout
-    printf("%s\n", bufferLettura);
     
-    // closing the fifo
-    close(serverFIFO);
-    
-    // Removing FIFO
-    unlink(path2ServerFIFO);
+    // [c0] chiusura delle fifo
+    if (close(serverFIFO) != 0)
+        errExit("close serverFIFO failed");
+    if (close(clientFIFO) != 0)
+        errExit("close clientFIFO failed");
 
+    // [c1] Rimozione della FIFO propria
+    printf("<Server> removing FIFO...\n");
+    if (unlink(path2ServerFIFO) != 0)
+        errExit("unlink serverFIFO failed");
 
     exit(0);
 }
