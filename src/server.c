@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
 #include "errExit.h"
+#include "SHA_256.h"
+
 
 #define LEN 256
 
@@ -17,6 +20,8 @@ int main(int argc, char *argv[]) {
     char *path2ServerFIFO = "./obj/serverFIFO";
     char *path2ClientFIFO = "./obj/clientFIFO";
     int bufferLettura;
+    uint8_t hash[32];
+    char char_hash[65];
     char clientMessage[LEN];
 
     // [01] Crea fd per FIFO
@@ -47,15 +52,27 @@ int main(int argc, char *argv[]) {
     else
         printf("<Server> ClientMSG: %s\n", clientMessage);
 
+    
+    
+    
+    // [04] Eseguo SHA256 sul file ricevuto e converte in stringa
+    digest_file(clientMessage, hash);
+    for(int i = 0; i < 32; i++)
+        sprintf(char_hash + (i * 2), "%02x", hash[i]);
+    printf("<Server> SHA256: %s\n", char_hash);
 
-    // [04] Open the FIFO created by Client in write-only mode
+    
+
+    // [05] Open the FIFO created by Client in write-only mode
     int clientFIFO = open(path2ClientFIFO, O_WRONLY);
     if (clientFIFO == -1)
         errExit("open failed");
 
-    // [05] Mando al Client la conferma di ricevuta messaggio
+    // [06] Mando al Client la conferma di ricevuta messaggio
     char serverMessage[2*LEN];
-    strcat(serverMessage, clientMessage);  // Concatena str2 a str1
+    strcat("File: ", clientMessage);
+    strcat(serverMessage, "SHA256: ");
+    strcat(serverMessage, char_hash);
     printf("<Server> inviando la risposta : %s\n", serverMessage);
     if (write(clientFIFO, &serverMessage[0], sizeof(serverMessage)) != sizeof(serverMessage))
         errExit("write failed");
@@ -77,3 +94,10 @@ int main(int argc, char *argv[]) {
 
 // Returns 0 on success, or -1 on error
 int mkfifo(const char *pathname, mode_t mode);
+
+
+
+
+
+
+
