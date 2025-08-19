@@ -1,7 +1,7 @@
 # Todo List Progetto SOP
 
 - [x] Creare Server e Client che si parlano tra di loro con FIFO
-- [ ] Creare meccanismo di generazione SHA
+- [x] Creare meccanismo di generazione SHA
 - [ ] Struct comunicazione tra client e server
 - [ ] Istanzia piu thread server per gestire richieste client multiple in parallelo (limitati)
 - [ ] Scheduling in ordine di dimensione file (prima il più piccolo variabile)
