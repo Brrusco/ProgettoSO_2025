@@ -24,7 +24,7 @@ struct Message {
  * message server types :
  * 101: Server filePath confirm     // ACK dice ok ho ricevuto il path adesso (non?) calcolo lo SHA (non e ancora finito) e restituisce il ticket del processo SHA
  * 102: Server Ticket Status        // ritorna lo stato del thread che sta calcolando la SHA del client che richiede
- * 103: Server fileFirm response    // quando il server ha finito di calcolare lo SHA manda la impronta al client
+ * 103: Server fileFirm response    // quando il server ha finito di calcolare lo SHA manda la impronta al client, nello status il numero di ticket
  * 104: EasterEgg                   // TODO:
 */
 
