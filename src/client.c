@@ -1,10 +1,13 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <uuid/uuid.h>
+#include <string.h>
+
 #include "errExit.h"
 #include "msg.h"
 
@@ -14,11 +17,7 @@ int main(int argc, char *argv[]) {
 
     printf("hello world - Client\n");
 
-    char serverResponse[LEN];
     char clientMessage [LEN];
-    int serverFIFO;
-    int clientFIFO;
-    int bufferLettura;
     struct Message msgRead;
     struct Message msgWrite;
     uuid_t clientId;
@@ -33,7 +32,7 @@ int main(int argc, char *argv[]) {
     snprintf(path2ServerFIFO, sizeof(path2ServerFIFO), "%s%s", baseFIFOpath, uuid_str);
 
     char path2ClientFIFO [LEN];
-    uuid_unparse(serverId, uuid_str);
+    uuid_unparse(clientId, uuid_str);
     snprintf(path2ClientFIFO, sizeof(path2ClientFIFO), "%s%s", baseFIFOpath, uuid_str);
 
 
@@ -52,26 +51,19 @@ int main(int argc, char *argv[]) {
 
     
     // [02] Apro la fifo del srv per scrivere le richieste
-    serverFIFO = open(path2ServerFIFO, O_WRONLY);
-    if (serverFIFO == -1)
-        errExit("[ERROR] open serverFIFO failed");
+
 
     // [05] Attendo il server (02 SRV)
-    printf("<Client> Aspettando il server...\n");
-    clientFIFO = open(path2ClientFIFO, O_RDONLY);
-    if (clientFIFO == -1)
-        errExit("[ERROR] open clientFIFO failed");
-    else
-        printf("<Client> Aspettando la risposta del server...\n");
 
 
     while(1){
         // [03] Chiedo all'utente la path del file
-        printf("<Client> Dammi la Path del File su cui eseguire SHA256: ");
+        printf("<Client> Dammi la Path del File su cui eseguire SHA256: \n");
         scanf("%s", clientMessage);
 
         // [04] Creo il messaggio da inviare al server
-        msgWrite.messageType = 1;                                               // Tipo di messaggio: richiesta SHA256
+        msgWrite.messageType = 1;
+        msgWrite.status = 0;
         memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
         memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
         snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
@@ -80,18 +72,11 @@ int main(int argc, char *argv[]) {
 
         if(fork() == 0){ // apertura figlio in modalita lettura             (ATTENZIONE non sono sicuro fork ==0 sia il filgio potrebbe essere il padre)
             // [06] Lettura della FIFO (03 SRV)
-            read(clientFIFO, &msgRead, sizeof(msgRead));
+            receive(clientId, &msgRead);
         }
         
     }
-    
-    // [c0] SRV Chiude la FIFO del server (l'Unlink lo fa  il server oppure errExit)
-    if (close(serverFIFO) != 0)
-        errExit("close serverFIFO failed");
-
-    // [c1] Chiudo e rimuovo la FIFO del client
-    if (close(clientFIFO) != 0)
-        errExit("close clientFIFO failed");
+   
     if (unlink(path2ClientFIFO) != 0)
         errExit("unlink clientFIFO failed");
 

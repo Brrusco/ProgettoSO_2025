@@ -30,6 +30,6 @@ $(OBJ_DIR):
 .PHONY: clean
 
 clean:
-	@rm -f $(OBJ_DIR)/*.o
+	@rm -f $(OBJ_DIR)*
 	@rm -f $(BIN_DIR)*
 	@echo "Removed object files and executables..."
