@@ -24,17 +24,17 @@ void send(struct Message *message){
     int fifoPointer = open(fifoPath, O_WRONLY);
     if (fifoPointer == -1) {
         printf("[ERROR] fifo : %s", fifoPath);
-        errExit("[ERROR] open fifo failed");
+        errExit("[ERROR] Send : open fifo failed");
     }
 
     // [3] Scrive nella FIFO se esiste
     if (write(fifoPointer, message, sizeof(struct Message)) != sizeof(struct Message)){
         if (errno == ENOENT) {
             printf("[ERROR] fifo : %s", fifoPath);
-            errExit("[ERROR] FIFO non esiste, assicurati che il client sia in esecuzione.\n");
+            errExit("[ERROR] Send : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
         }else {
             printf("fifo : %s", fifoPath);
-            errExit("[ERROR] write on fifo failed");
+            errExit("[ERROR] Send : write on fifo failed");
         }
     }
 
@@ -53,15 +53,18 @@ void send(struct Message *message){
         case 3:
             printf("[DEBUG] Invio richiesta di chiusura connessione a %s\n", fifoPath);
             break;
+         case 101:
+            printf("[DEBUG] Invio risposta dal server in merito alla richiesta del file\n" );
+            break;
         default:
-            fprintf(stderr, "<Error> Tipo di messaggio sconosciuto: %d\n", message->messageType);
+            fprintf(stderr, "<Error> Send : Tipo di messaggio sconosciuto: %d\n", message->messageType);
             return;
     }
     
     // [5] Chiudo la FIFO (non distrugge)
     if (close(fifoPointer) != 0){
         printf("[ERROR] fifo : %s", fifoPath);
-        errExit("[ERROR] close fifo failed");
+        errExit("[ERROR] Send : close fifo failed");
     }
         
 }
@@ -81,17 +84,17 @@ void receive(uuid_t idFifo, struct Message *msg){
     fifoPointer = open(fifoPath, O_RDONLY);
     if (fifoPointer == -1) {
         printf("[ERROR] fifo : %s", fifoPath);
-        errExit("[ERROR] open fifo failed");
+        errExit("[ERROR] Receive : open fifo failed");
     }       
      
     // [3] Legge la fifo e attende i messaggi
     if(read(fifoPointer, msg, sizeof(struct Message)) != sizeof(struct Message)){
         if (errno == ENOENT) {
             printf("[ERROR] fifo : %s", fifoPath);
-            errExit("[ERROR] FIFO non esiste, assicurati che il client sia in esecuzione.\n");
+            errExit("[ERROR] Receive : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
         } else {
             printf("fifo : %s", fifoPath);
-            errExit("[ERROR] write on fifo failed");
+            errExit("[ERROR] Receive : read on fifo failed");
         }
     }
     
@@ -125,7 +128,7 @@ void receive(uuid_t idFifo, struct Message *msg){
 
             break;
         default:
-           printf("<Error> Tipo di messaggio sconosciuto: %d\n", msg->messageType);
+           printf("<Error> Receive : Tipo di messaggio sconosciuto: %d\n", msg->messageType);
             break;
     }
         

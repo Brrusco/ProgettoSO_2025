@@ -7,9 +7,14 @@
 #include <sys/types.h>
 #include <uuid/uuid.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
+
 
 #include "errExit.h"
 #include "msg.h"
+
 
 #define LEN 256
 
@@ -18,8 +23,7 @@ typedef struct node {
     struct node *next;
 } node;
 
-
-// Aggiunge un intero alla testa della lista
+// Aggiunge un intero alla coda della lista
 void addIntToList(node **head, int value) {
     node *newNode = malloc(sizeof(node));
     if (!newNode) {
@@ -27,8 +31,17 @@ void addIntToList(node **head, int value) {
         exit(EXIT_FAILURE);
     }
     newNode->value = value;
-    newNode->next = *head;
-    *head = newNode;
+    newNode->next = NULL;
+
+    if (*head == NULL) {
+        *head = newNode;
+    } else {
+        node *curr = *head;
+        while (curr->next != NULL) {
+            curr = curr->next;
+        }
+        curr->next = newNode;
+    }
 }
 
 // Rimuove la prima occorrenza di un intero dalla lista
@@ -58,10 +71,25 @@ int stringToInt(const char *str) {
     return value;
 }
 
+void printStatus(node *linkedTicketList) {
+    printf("┌───────────────────────────────────────┐\n");
+    printf("│ File in elaborazione:                 │\n");
+    for(node *curr = linkedTicketList; curr != NULL; curr = curr->next) {
+        printf("│ ◈ Ticket ID: %d\t\t\t│\n", curr->value);
+    }
+    if (linkedTicketList == NULL) {
+        printf("│ ◈ Nessun file in elaborazione\t\t│\n");
+    }
+    printf("│ ◈ TESTA: %d\t\t\t│\n", linkedTicketList);
+    printf("└───────────────────────────────────────┘\n");
+}
+
 
 int main(int argc, char *argv[]) {
 
-    printf("hello world - Client\n");
+    printf("╔═══════════════════════════════════════╗\n");
+    printf("║          Benvenuto nel Client         ║\n");
+    printf("╚═══════════════════════════════════════╝\n");
 
     char clientMessage [LEN];
     struct Message msgRead;
@@ -71,9 +99,11 @@ int main(int argc, char *argv[]) {
     char uuid_str[37];
     int scelta;
     int exitCode;
+    int cont=0;
+    int shmid;
 
     exitCode = 1;
-    node *likedTickets = NULL;
+    node *linkedTickets = NULL;
 
     uuid_generate(clientId);
     memset(serverId, 0, sizeof(uuid_t)); // server id settato a 0
@@ -85,7 +115,44 @@ int main(int argc, char *argv[]) {
     char path2ClientFIFO [LEN];
     uuid_unparse(clientId, uuid_str);
     snprintf(path2ClientFIFO, sizeof(path2ClientFIFO), "%s%s", baseFIFOpath, uuid_str);
+    
 
+
+     // Crea un segmento di memoria condivisa
+    shmid = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0666);
+    if (shmid == -1) {
+        perror("shmget");
+        exit(1);
+    }
+    
+    // Attacca il segmento di memoria al processo
+    linkedTickets = (struct node*)shmat(shmid, NULL, 0);
+    if (linkedTickets == (node*)-1) {
+        perror("[ERROR] in creazione memoria condivisa");
+        exit(1);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
 
 
     printf("<Client> opening FIFO %s...\n", path2ClientFIFO);
@@ -104,55 +171,35 @@ int main(int argc, char *argv[]) {
 
     while(1 && exitCode){
 
-        if(fork() == 0){ // apertura figlio in modalita lettura             (ATTENZIONE non sono sicuro fork ==0 sia il filgio potrebbe essere il padre)
-            // [06] Lettura della FIFO (03 SRV)
-            receive(clientId, &msgRead);
-
-            // Controllo il tipo di messaggio ricevuto
-            if (msgRead.messageType == 101 && msgRead.status == 200) {
-                addIntToList(&likedTickets, stringToInt(msgRead.data));
-            }
-
-            if (msgRead.messageType == 103 ) {
-                removeIntFromList(&likedTickets, stringToInt(msgRead.data));
-            }
-        }
-
-
+        printf("\n");
+        cont++;
+        printf("<> Ciclo numero: %d\n", cont);
+        printf("\n");
         // MENU | Child process (TODO: lock with mutex the while)
 
         /*
         OPTIONS:
-        1. Richiedi hash di path/to/file.
-        2. Richiedi status di fileInCalcolo.
-        3. Chiudi il client.
+            1. Richiedi hash di path/to/file.
+            2. Richiedi status di fileInCalcolo.
+            3. Chiudi il client.
         */
+
+        printStatus(linkedTickets);
+
         printf("┌───────────────────────────────────────┐\n");
-        printf("│ File in elaborazione:                 │\n");
-        for(node *curr = likedTickets; curr != NULL; curr = curr->next) {
-            printf("│ ◈ Ticket ID: %d\t\t\t│\n", curr->value);
-        }
-        if (likedTickets == NULL) {
-            printf("│ ◈ Nessun file in elaborazione\t\t│\n");
-        }
+        printf("│ Opzioni:                              │\n");
+        printf("│ 1. Richiedi hash di path/to/file.     │\n");
+        printf("│ 2. Richiedi status di fileInCalcolo.  │\n");
+        printf("│ 3. Chiudi il client.                  │\n");
         printf("└───────────────────────────────────────┘\n");
-
-        printf("┌─────────────────────────────────────┐\n");
-        printf("│ Opzioni:                            │\n");
-        printf("│ 1. Richiedi hash di path/to/file.   │\n");
-        printf("│ 2. Richiedi status di fileInCalcolo.│\n");
-        printf("│ 3. Chiudi il client.                │\n");
-        printf("└─────────────────────────────────────┘\n");
-
-        // Necessario un altro semaforo poiche potrebbe avere problemi con la funzione receive() causando un loop
-        printf("Seleziona un'opzione: ");
-        scanf("%d", &scelta);
+        printf("Seleziona un'opzione: \n");
+        scanf(" %d", &scelta);
 
         switch (scelta) {
             case 1:
                 // [03] Chiedo all'utente la path del file
                 printf("<Client> Dammi la Path del File su cui eseguire SHA256: \n");
-                scanf("%s", clientMessage);
+                scanf(" %s", clientMessage);
 
                 // [04] Creo il messaggio da inviare al server
                 msgWrite.messageType = 1;
@@ -163,11 +210,31 @@ int main(int argc, char *argv[]) {
 
                 send(&msgWrite);
                 scelta = 0;
+
+                if(fork() == 0){ // apertura figlio in modalita lettura             (ATTENZIONE non sono sicuro fork ==0 sia il figlio potrebbe essere il padre)
+                    // [06] Lettura della FIFO (03 SRV)
+                    receive(clientId, &msgRead);
+
+                    // Controllo il tipo di messaggio ricevuto
+                    if (msgRead.messageType == 101 && msgRead.status == 200) {
+                        addIntToList(&linkedTickets, stringToInt(msgRead.data));
+                        printStatus(linkedTickets);
+                    }
+
+                    if (msgRead.messageType == 103 ) {
+                        // TORM printf("Rimosso ticket #%d\n",stringToInt(msgRead.data));
+                        removeIntFromList(&linkedTickets, stringToInt(msgRead.data));
+                    }
+
+                    shmdt(linkedTickets);// stacco memoria condivisa
+                    // Chiudo il figlio
+                    exit(0);
+                }
                 break;
             case 2:
                 // [03] Richiedi status di fileInCalcolo
                 printf("<Client> Inserisci il ticket: \n");
-                scanf("%s", clientMessage);
+                scanf(" %s", clientMessage);
 
                 // [04] Creo il messaggio da inviare al server
                 msgWrite.messageType = 2;
@@ -188,11 +255,15 @@ int main(int argc, char *argv[]) {
                 printf("Opzione non valida.\n");
                 break;
         }
-        
+        sleep(1.5);
     }
    
     if (unlink(path2ClientFIFO) != 0)
         errExit("unlink clientFIFO failed");
+
+    // stacco e cancello memoria condivisa
+    shmdt(linkedTickets);
+    shmctl(shmid, IPC_RMID, NULL);
 
     exit(0);
 }

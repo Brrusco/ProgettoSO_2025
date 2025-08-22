@@ -17,7 +17,9 @@
 
 
 int main(int argc, char *argv[]) {
-    printf("hello world Server\n");
+    printf("╔═══════════════════════════════════════╗\n");
+    printf("║          Benvenuto nel Server         ║\n");
+    printf("╚═══════════════════════════════════════╝\n");
     
     uuid_t serverId;
     uint8_t hash[32];
@@ -102,6 +104,7 @@ int main(int argc, char *argv[]) {
             printf("[DEBUG] figlio chius0\n");
             exit(0);
         }
+
     }
 
     
