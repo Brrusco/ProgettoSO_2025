@@ -126,11 +126,16 @@ int main(int argc, char *argv[]) {
         1. Richiedi hash di path/to/file.
         2. Richiedi status di fileInCalcolo.
         3. Chiudi il client.
-        */ 
-        printf("File in elaborazione:\n");
+        */
+        printf("┌───────────────────────────────────────┐\n");
+        printf("│ File in elaborazione:                 │\n");
         for(node *curr = likedTickets; curr != NULL; curr = curr->next) {
-            printf("◈ Ticket ID: %d\n", curr->value);
+            printf("│ ◈ Ticket ID: %d\t\t\t│\n", curr->value);
         }
+        if (likedTickets == NULL) {
+            printf("│ ◈ Nessun file in elaborazione\t\t│\n");
+        }
+        printf("└───────────────────────────────────────┘\n");
 
         printf("┌─────────────────────────────────────┐\n");
         printf("│ Opzioni:                            │\n");
@@ -138,9 +143,9 @@ int main(int argc, char *argv[]) {
         printf("│ 2. Richiedi status di fileInCalcolo.│\n");
         printf("│ 3. Chiudi il client.                │\n");
         printf("└─────────────────────────────────────┘\n");
-        printf("Seleziona un'opzione: ");
 
         // Necessario un altro semaforo poiche potrebbe avere problemi con la funzione receive() causando un loop
+        printf("Seleziona un'opzione: ");
         scanf("%d", &scelta);
 
         switch (scelta) {
@@ -157,6 +162,7 @@ int main(int argc, char *argv[]) {
                 snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
 
                 send(&msgWrite);
+                scelta = 0;
                 break;
             case 2:
                 // [03] Richiedi status di fileInCalcolo
@@ -171,6 +177,7 @@ int main(int argc, char *argv[]) {
                 snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
 
                 send(&msgWrite);
+                scelta = 0;
                 break;
             case 3:
                 // Chiudi il filgio e il client

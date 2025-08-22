@@ -77,7 +77,7 @@ void receive(uuid_t idFifo, struct Message *msg){
     snprintf(fifoPath, sizeof(fifoPath), "%s%s", baseFIFOpath, uuid_str);
     
     // [2] Apro la FIFO in lettura
-    printf("opening fifo on read : %s \n", fifoPath);
+    //printf("[DEBUG] opening fifo on read : %s \n", fifoPath);
     fifoPointer = open(fifoPath, O_RDONLY);
     if (fifoPointer == -1) {
         printf("[ERROR] fifo : %s", fifoPath);
@@ -96,20 +96,24 @@ void receive(uuid_t idFifo, struct Message *msg){
     }
     
     // [4] Switch in base al tipo di messaggio per il client e il server
+    printf("┌───────────────────────────────────────┐\n");
+    printf("│ Risposta:\t\t\t\t│\n");
+    printf("│ MESSAGE TYPE: \t%d\t\t│\n", msg->messageType);
+    printf("│ STATUS: \t\t%d\t\t│\n", msg->status);
+    printf("│ DATA: \t\t%s\t\t│\n", msg->data);
+    printf("└───────────────────────────────────────┘\n");
     switch (msg->messageType) {
         case 1:
             printf("[DEBUG] Ricevuto richiesta filePath a %s\n", fifoPath);
-        break;
+            break;
         case 2:
             printf("[DEBUG] Ricevuto richiesta stato ticket a %s\n", fifoPath);
-        break;
+            break;
         case 3:
             printf("[DEBUG] Ricevuto richiesta di chiusura connessione a %s\n", fifoPath);
-        break;
+            break;
         case 101:
-            printf("[DEBUG] Ricevuto risposta dal server in merito alla richiesta el file\n" );
-            printf("STATUS: %d : ", msg->status);
-            
+            printf("[DEBUG] Ricevuto risposta dal server in merito alla richiesta del file\n" );
 
             if (msg->status == 200) {
                 printf("[DEBUG] Ticket ricevuto: %s\n", msg->data);
@@ -119,14 +123,10 @@ void receive(uuid_t idFifo, struct Message *msg){
                 printf("[DEBUG] Stato sconosciuto: %d\n", msg->status);
             }
 
-        break;
-        case 102:
-        break;
-        case 103:
-        break;
+            break;
         default:
            printf("<Error> Tipo di messaggio sconosciuto: %d\n", msg->messageType);
-        return;
+            break;
     }
         
         
