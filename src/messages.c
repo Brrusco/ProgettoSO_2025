@@ -53,7 +53,10 @@ void send(struct Message *message){
         case 3:
             printf("[DEBUG] Invio richiesta di chiusura connessione a %s\n", fifoPath);
             break;
-         case 101:
+        case 5:
+            printf("[DEBUG] msg Client <-> Client \n");
+            break;
+        case 101:
             printf("[DEBUG] Invio risposta dal server in merito alla richiesta del file\n" );
             break;
         default:
@@ -114,6 +117,9 @@ void receive(uuid_t idFifo, struct Message *msg){
             break;
         case 3:
             printf("[DEBUG] Ricevuto richiesta di chiusura connessione a %s\n", fifoPath);
+            break;
+        case 5:
+            printf("[DEBUG] msg Client <-> Client \n");
             break;
         case 101:
             printf("[DEBUG] Ricevuto risposta dal server in merito alla richiesta del file\n" );

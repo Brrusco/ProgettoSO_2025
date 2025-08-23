@@ -3,13 +3,14 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <semaphore.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <uuid/uuid.h>
 #include <string.h>
 #include <sys/ipc.h>
-#include <sys/shm.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 
 
 #include "errExit.h"
@@ -80,8 +81,17 @@ void printStatus(node *linkedTicketList) {
     if (linkedTicketList == NULL) {
         printf("│ ◈ Nessun file in elaborazione\t\t│\n");
     }
-    printf("│ ◈ TESTA: %d\t\t\t│\n", linkedTicketList);
     printf("└───────────────────────────────────────┘\n");
+}
+
+void printMenu() {
+    printf("┌───────────────────────────────────────┐\n");
+    printf("│ Opzioni:                              │\n");
+    printf("│ 1. Richiedi hash di path/to/file.     │\n");
+    printf("│ 2. Richiedi status di fileInCalcolo.  │\n");
+    printf("│ 3. Chiudi il client.                  │\n");
+    printf("└───────────────────────────────────────┘\n");
+    printf("Seleziona un'opzione: \n");
 }
 
 
@@ -100,7 +110,6 @@ int main(int argc, char *argv[]) {
     int scelta;
     int exitCode;
     int cont=0;
-    int shmid;
 
     exitCode = 1;
     node *linkedTickets = NULL;
@@ -115,25 +124,6 @@ int main(int argc, char *argv[]) {
     char path2ClientFIFO [LEN];
     uuid_unparse(clientId, uuid_str);
     snprintf(path2ClientFIFO, sizeof(path2ClientFIFO), "%s%s", baseFIFOpath, uuid_str);
-    
-
-
-     // Crea un segmento di memoria condivisa
-    shmid = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0666);
-    if (shmid == -1) {
-        perror("shmget");
-        exit(1);
-    }
-    
-    // Attacca il segmento di memoria al processo
-    linkedTickets = (struct node*)shmat(shmid, NULL, 0);
-    if (linkedTickets == (node*)-1) {
-        perror("[ERROR] in creazione memoria condivisa");
-        exit(1);
-    }
-
-
-
 
 
 
@@ -175,95 +165,116 @@ int main(int argc, char *argv[]) {
         cont++;
         printf("<> Ciclo numero: %d\n", cont);
         printf("\n");
-        // MENU | Child process (TODO: lock with mutex the while)
 
-        /*
-        OPTIONS:
-            1. Richiedi hash di path/to/file.
-            2. Richiedi status di fileInCalcolo.
-            3. Chiudi il client.
-        */
 
-        printStatus(linkedTickets);
+        if(fork() == 0) {
+            // Stampo il menu
 
-        printf("┌───────────────────────────────────────┐\n");
-        printf("│ Opzioni:                              │\n");
-        printf("│ 1. Richiedi hash di path/to/file.     │\n");
-        printf("│ 2. Richiedi status di fileInCalcolo.  │\n");
-        printf("│ 3. Chiudi il client.                  │\n");
-        printf("└───────────────────────────────────────┘\n");
-        printf("Seleziona un'opzione: \n");
-        scanf(" %d", &scelta);
+            char scelta[2];
 
-        switch (scelta) {
-            case 1:
-                // [03] Chiedo all'utente la path del file
-                printf("<Client> Dammi la Path del File su cui eseguire SHA256: \n");
-                scanf(" %s", clientMessage);
+            memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
+            memcpy(msgWrite.destinationId, clientId, sizeof(uuid_t));
+            msgWrite.messageType = 5;
+            msgWrite.status = 0;
 
-                // [04] Creo il messaggio da inviare al server
-                msgWrite.messageType = 1;
-                msgWrite.status = 0;
-                memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
-                memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
-                snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
+            printMenu();
 
-                send(&msgWrite);
-                scelta = 0;
+            scanf(" %s", scelta);
+            snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", scelta);
 
-                if(fork() == 0){ // apertura figlio in modalita lettura             (ATTENZIONE non sono sicuro fork ==0 sia il figlio potrebbe essere il padre)
-                    // [06] Lettura della FIFO (03 SRV)
-                    receive(clientId, &msgRead);
+            send(&msgWrite);
 
-                    // Controllo il tipo di messaggio ricevuto
-                    if (msgRead.messageType == 101 && msgRead.status == 200) {
-                        addIntToList(&linkedTickets, stringToInt(msgRead.data));
-                        printStatus(linkedTickets);
-                    }
-
-                    if (msgRead.messageType == 103 ) {
-                        // TORM printf("Rimosso ticket #%d\n",stringToInt(msgRead.data));
-                        removeIntFromList(&linkedTickets, stringToInt(msgRead.data));
-                    }
-
-                    shmdt(linkedTickets);// stacco memoria condivisa
-                    // Chiudo il figlio
-                    exit(0);
-                }
-                break;
-            case 2:
-                // [03] Richiedi status di fileInCalcolo
-                printf("<Client> Inserisci il ticket: \n");
-                scanf(" %s", clientMessage);
-
-                // [04] Creo il messaggio da inviare al server
-                msgWrite.messageType = 2;
-                msgWrite.status = 0;
-                memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
-                memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
-                snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
-
-                send(&msgWrite);
-                scelta = 0;
-                break;
-            case 3:
-                // Chiudi il filgio e il client
-                printf("<Client> Chiudo il client.\n");
-                exitCode = 0;
-                break;
-            default:
-                printf("Opzione non valida.\n");
-                break;
+            // Chiudo il figlio
+            exit(0);
         }
-        sleep(1.5);
+
+        // [06] Lettura della FIFO (03 SRV)
+        printStatus(linkedTickets);
+        receive(clientId, &msgRead);
+
+
+        // Controllo il tipo di messaggio ricevuto
+        if (msgRead.messageType == 101 && msgRead.status == 200) {
+            addIntToList(&linkedTickets, stringToInt(msgRead.data));
+            printStatus(linkedTickets);
+        }
+        if (msgRead.messageType == 103 ) {
+            removeIntFromList(&linkedTickets, msgRead.status);
+            printf("┌───────────────────────────────────────┐\n");
+            printf("│ Hash calcolato:                       │\n");
+            printf("│ %s │\n", msgRead.data);
+            printf("└───────────────────────────────────────┘\n");
+            printStatus(linkedTickets);
+        }
+
+        if (msgRead.messageType == 5 ) {
+            scelta = stringToInt(msgRead.data);
+
+            /*
+            OPTIONS:
+                1. Richiedi hash di path/to/file.
+                2. Richiedi status di fileInCalcolo.
+                3. Chiudi il client.
+            */
+
+            switch (scelta) {
+                case 1:
+                    // [03] Chiedo all'utente la path del file
+                    printf("<Client> Dammi la Path del File su cui eseguire SHA256: \n");
+                    scanf(" %s", clientMessage);
+
+                    // [04] Creo il messaggio da inviare al server
+                    msgWrite.messageType = 1;
+                    msgWrite.status = 0;
+                    memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
+                    memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
+                    snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
+
+                    send(&msgWrite);
+                    scelta = 0;
+
+                    
+                    
+                    break;
+                case 2:
+                    // [03] Richiedi status di fileInCalcolo
+                    printf("<Client> Inserisci il ticket: \n");
+                    scanf(" %s", clientMessage);
+
+                    // [04] Creo il messaggio da inviare al server
+                    msgWrite.messageType = 2;
+                    msgWrite.status = 0;
+                    memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
+                    memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
+                    snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
+
+                    send(&msgWrite);
+                    scelta = 0;
+                    break;
+                case 3:
+                    // Chiudi il filgio e il client
+                    printf("<Client> Chiudo il client.\n");
+                    exitCode = 0;
+                    break;
+                default:
+                    printf("Opzione non valida.\n");
+                    break;
+            }
+        }
+
+
+
+        
+
+
+
+
+        
+
     }
    
     if (unlink(path2ClientFIFO) != 0)
         errExit("unlink clientFIFO failed");
-
-    // stacco e cancello memoria condivisa
-    shmdt(linkedTickets);
-    shmctl(shmid, IPC_RMID, NULL);
 
     exit(0);
 }
