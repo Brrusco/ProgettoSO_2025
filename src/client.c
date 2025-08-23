@@ -64,8 +64,10 @@ void removeIntFromList(node **head, int value) {
 
 // String to int
 int stringToInt(const char *str) {
+
+    // convert only chars between 0-9
     int value = 0;
-    while (*str) {
+    while (*str >= '0' && *str <= '9') {
         value = value * 10 + (*str - '0');
         str++;
     }
@@ -157,7 +159,7 @@ int main(int argc, char *argv[]) {
     else
         printf("<Client> FIFO %s created!\n", path2ClientFIFO);
 
-    
+    msgRead.messageType = 5; // forzo il menu alla prima iterazione
 
     while(1 && exitCode){
 
@@ -170,14 +172,20 @@ int main(int argc, char *argv[]) {
         if(fork() == 0) {
             // Stampo il menu
 
+            if (msgRead.messageType != 5) {
+                // Il menu è scatenato solo dopo che riceve una scelta.
+                // La prima scelta è scatenata artificialmente
+                exit(0);
+            }
+
             char scelta[2];
+            
+            printMenu();
 
             memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
             memcpy(msgWrite.destinationId, clientId, sizeof(uuid_t));
             msgWrite.messageType = 5;
             msgWrite.status = 0;
-
-            printMenu();
 
             scanf(" %s", scelta);
             snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", scelta);
@@ -189,17 +197,19 @@ int main(int argc, char *argv[]) {
         }
 
         // [06] Lettura della FIFO (03 SRV)
+        printf("\n\n\n");
         printStatus(linkedTickets);
         receive(clientId, &msgRead);
 
 
         // Controllo il tipo di messaggio ricevuto
         if (msgRead.messageType == 101 && msgRead.status == 200) {
-            addIntToList(&linkedTickets, stringToInt(msgRead.data));
+            addIntToList(&linkedTickets, msgRead.ticketNumber);
             printStatus(linkedTickets);
         }
+        
         if (msgRead.messageType == 103 ) {
-            removeIntFromList(&linkedTickets, msgRead.status);
+            removeIntFromList(&linkedTickets, msgRead.ticketNumber);
             printf("┌───────────────────────────────────────┐\n");
             printf("│ Hash calcolato:                       │\n");
             printf("│ %s │\n", msgRead.data);
@@ -209,6 +219,7 @@ int main(int argc, char *argv[]) {
 
         if (msgRead.messageType == 5 ) {
             scelta = stringToInt(msgRead.data);
+            printf("\nCLIENT: RICEVE LA SCELTA %d\n", scelta);
 
             /*
             OPTIONS:
@@ -220,8 +231,14 @@ int main(int argc, char *argv[]) {
             switch (scelta) {
                 case 1:
                     // [03] Chiedo all'utente la path del file
+
                     printf("<Client> Dammi la Path del File su cui eseguire SHA256: \n");
-                    scanf(" %s", clientMessage);
+                    fgets(clientMessage, sizeof(clientMessage), stdin);
+                    // Remove trailing newline if present
+                    clientMessage[strcspn(clientMessage, "\n")] = 0;
+
+                    printf("\nCLIENT: CHIEDE IL FILE %s\n", clientMessage);
+
 
                     // [04] Creo il messaggio da inviare al server
                     msgWrite.messageType = 1;
