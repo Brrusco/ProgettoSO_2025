@@ -24,7 +24,8 @@ void send(struct Message *message){
     int fifoPointer = open(fifoPath, O_WRONLY);
     if (fifoPointer == -1) {
         printf("[ERROR] fifo : %s", fifoPath);
-        errExit("[ERROR] Send : open fifo failed");
+        printf("[ERROR] Probabile processo non avviato \n");
+        errExit("[ERROR] Send : open fifo failed\n");
     }
 
     // [3] Scrive nella FIFO se esiste
@@ -32,9 +33,9 @@ void send(struct Message *message){
         if (errno == ENOENT) {
             printf("[ERROR] fifo : %s", fifoPath);
             errExit("[ERROR] Send : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
-        }else {
+        } else {
             printf("fifo : %s", fifoPath);
-            errExit("[ERROR] Send : write on fifo failed");
+            errExit("[ERROR] Send : write on fifo failed\n");
         }
     }
 
@@ -54,10 +55,16 @@ void send(struct Message *message){
             printf("[DEBUG] Invio richiesta di chiusura connessione a %s\n", fifoPath);
             break;
         case 5:
-            printf("[DEBUG] msg Client <-> Client \n");
+            printf("[DEBUG] SND msg Client <-> Client \n");
             break;
         case 101:
             printf("[DEBUG] Invio risposta dal server in merito alla richiesta del file\n" );
+            break;
+        case 103:
+            printf("[DEBUG] Invio risposta dal server con hash del file\n");
+            break;
+        case 105:
+            printf("[DEBUG] msg Server <-> Server \n");
             break;
         default:
             fprintf(stderr, "<Error> Send : Tipo di messaggio sconosciuto: %d\n", message->messageType);
@@ -119,22 +126,19 @@ void receive(uuid_t idFifo, struct Message *msg){
             printf("[DEBUG] Ricevuto richiesta di chiusura connessione a %s\n", fifoPath);
             break;
         case 5:
-            printf("[DEBUG] msg Client <-> Client \n");
+            printf("[DEBUG] RCV msg Client <-> Client \n");
             break;
         case 101:
             printf("[DEBUG] Ricevuto risposta dal server in merito alla richiesta del file\n" );
-
-            if (msg->status == 200) {
-                printf("[DEBUG] Ticket ricevuto: %s\n", msg->data);
-            } else if (msg->status == 404) {
-                printf("[DEBUG] Errore: %s\n", msg->data);
-            } else {
-                printf("[DEBUG] Stato sconosciuto: %d\n", msg->status);
-            }
-
+            break;
+        case 103:
+            printf("[DEBUG] Ricevuto hash del file\n");
+            break;
+        case 105:
+            printf("[DEBUG] msg Server <-> Server \n");
             break;
         default:
-           printf("<Error> Receive : Tipo di messaggio sconosciuto: %d\n", msg->messageType);
+            printf("<Error> Receive : Tipo di messaggio sconosciuto: %d\n", msg->messageType);
             break;
     }
         

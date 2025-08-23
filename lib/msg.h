@@ -11,6 +11,7 @@ struct Message {
     int messageType;
     uuid_t senderId;      // definiti con uuid
     uuid_t destinationId; // definiti con uuid
+    int ticketNumber;
     int status;
     char data[LEN];
 };

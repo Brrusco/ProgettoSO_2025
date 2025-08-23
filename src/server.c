@@ -15,6 +15,133 @@
 
 #define LEN 256
 
+typedef struct node {
+    int ticketNumber;
+    int status; // 0 = in coda, 1 = in calcolo, 2 = completato
+    uuid_t clientId;
+    
+    char filePath[LEN];
+    char hash[65];
+
+
+    struct node *next;
+} node;
+
+int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, uuid_t clientId) {
+
+    // [0] Check memory allocation
+    node *newNode = malloc(sizeof(node));
+    if (!newNode) {
+        perror("Failed to allocate memory");
+        return -1;
+    }
+
+    // [1] Check filepath validity
+    if (access(filePath, F_OK) != 0) {
+        fprintf(stderr, "File %s does not exist\n", filePath);
+        free(newNode);
+        return -1;
+    }
+
+    // [2] Check if file is already in queue | TODO function searchByPath ?
+    node *current = *head;
+    while (current) {
+        if (strcmp(current->filePath, filePath) == 0) {
+            fprintf(stderr, "File %s is already in the queue\n", filePath);
+            free(newNode);
+            if (current->status == 2) {
+                return -3; // already computed
+            } else {
+                return -2; // already in queue or in progress
+            }
+        }
+        current = current->next;
+    }
+
+    // [3] Initialize new node
+    (*ticketCounterSystem)++;
+    newNode->ticketNumber = *ticketCounterSystem;    // ticket number
+    newNode->status = 0;                            // 0 = in coda
+    uuid_copy(newNode->clientId, clientId);
+    strncpy(newNode->filePath, filePath, LEN);
+    newNode->filePath[LEN - 1] = '\0';              // Ensure null-termination
+    newNode->next = NULL;
+
+    if (*head == NULL) {
+        *head = newNode;
+    } else {
+        node *current = *head;
+        while (current->next) {
+            current = current->next;
+        }
+        current->next = newNode;
+    }
+
+    // return -1 if path is invalid, -2 if file is already in queue, ticket number otherwise
+    return *ticketCounterSystem;
+}
+
+int setFileInProgress(node *head, const int ticketNumber) {
+    node *current = head;
+    while (current) {
+        if (current->ticketNumber == ticketNumber) {
+            current->status = 1;
+            return 0;
+        }
+        current = current->next;
+    }
+    return -1;
+}
+
+int setFileHash(node *head, const int ticketNumber, const char *hash) {
+    node *current = head;
+    while (current) {
+        if (current->ticketNumber == ticketNumber) {
+            current->status = 2;
+            strncpy(current->hash, hash, 65);
+            current->hash[64] = '\0';  // Ensure null-termination
+            return 0;
+        }
+        current = current->next;
+    }
+    return -1;  // File not found
+}
+
+int getTicketById(int ticketNumber, node *head, node *toClone) {
+    node *current = head;
+    while (current) {
+        if (current->ticketNumber == ticketNumber) {
+            memcpy(toClone, current, sizeof(node));
+            return 0;
+        }
+        current = current->next;
+    }
+    memset(toClone, 0, sizeof(node));  // Not found, return empty node
+    return -1;
+}
+
+// TODO trovare un modo per dire al figlio la path da lavorare
+
+void printStatus(node *linkedTicketList) {
+    printf("┌────────┬──────────────────────────────┐\n");
+    printf("│ TICKET │ STATUS\t\t\t│\n");
+    if (linkedTicketList != NULL) {
+        printf("├────────┴──────────────┬───────────────┤\n");
+    }
+    for(node *curr = linkedTicketList; curr != NULL; curr = curr->next) {
+        printf("│ ◈ Ticket ID: %d\t│ %s\t│\n", curr->ticketNumber, curr->status == 0 ? "In coda" : curr->status == 1 ? "In calcolo" : "Completato");
+        if (curr->next != NULL) {
+            printf("├───────────────────────┴───────────────┤\n");
+        } else {
+            printf("└───────────────────────┴───────────────┘\n");
+        }
+    }
+    if (linkedTicketList == NULL) {
+        printf("├────────┴──────────────────────────────┤\n");
+        printf("│ ◈ Nessun file in elaborazione\t\t│\n");
+        printf("└───────────────────────────────────────┘\n");
+    }
+}
 
 int main(int argc, char *argv[]) {
     printf("╔═══════════════════════════════════════╗\n");
@@ -25,12 +152,15 @@ int main(int argc, char *argv[]) {
     uint8_t hash[32];
     char uuid_str[37];
     char char_hash[65];
-    int ticketSystem;
     struct Message msgRead;
     struct Message msgWrite;
     char path2ServerFIFO [LEN];    
     
-    ticketSystem = 0;
+    node *head = NULL;
+
+    int ticketCounterSystem;
+    ticketCounterSystem = 0;
+
     memset(serverId, 0, sizeof(uuid_t));
     
     msgWrite.status = 0;
@@ -52,13 +182,126 @@ int main(int argc, char *argv[]) {
         printf("<Server> FIFO %s creata!\n", path2ServerFIFO);
     }
 
-
+    /** DEMO 
+    printStatus(head);
+    addFileInQueue(&head, &ticketCounterSystem, "lorem");
+    addFileInQueue(&head, &ticketCounterSystem, "pippo");
+    addFileInQueue(&head, &ticketCounterSystem, "pluto");
+    addFileInQueue(&head, &ticketCounterSystem, "paperino");
+    setFileInProgress(head, 1);
+    setFileHash(head, 1, "hash_value");
+    printStatus(head);
+    */
 
     while(1) {
         receive(serverId, &msgRead);
 
-    
-        
+        switch (msgRead.messageType) {
+            case 1:
+                // INIZIO LA PROCEDURA E INVIO RISPOSTA
+                int ticketGiven = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId);
+            
+                msgWrite.messageType = 101;
+                memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
+                memset(msgWrite.data, 0, sizeof(msgWrite.data));
+                if (ticketGiven > 0) {
+                    // ok in coda
+                    msgWrite.status = 200;
+                    msgWrite.ticketNumber = ticketGiven;
+                    send(&msgWrite);
+                    
+                } else if (ticketGiven == -1) {
+                    // file non esiste
+                    msgWrite.status = 404;
+                    msgWrite.ticketNumber = ticketGiven;
+                    send(&msgWrite);
+                    break;
+                } else if (ticketGiven == -2) {
+                    // file già in coda o in calcolo
+                    msgWrite.status = 405;
+                    msgWrite.ticketNumber = ticketGiven;
+                    send(&msgWrite);
+                    break;
+                } else if (ticketGiven == -3) {
+                    // file già calcolato
+                    msgWrite.status = 406;
+                    msgWrite.ticketNumber = ticketGiven;
+                    send(&msgWrite);
+                    break;
+                }
+
+                // CREO FIGLIO E INIZIO AD ELABORARE (SE FIGLI NON SONO OLTRE MAX)
+                // TODO: 
+                if (fork() == 0) {
+                    // figlio (entra solo se ticketGive è maggiore di 0)
+                    memset(hash, 0, sizeof(hash));
+                    memset(char_hash, 0, sizeof(char_hash));
+
+                    digest_file(msgRead.data, hash);
+                    
+                    for(int i = 0; i < 32; i++) {
+                        sprintf(char_hash + (i * 2), "%02x", hash[i]);
+                    }
+                    // invio il risultato al server che poi lo gira a client
+                    msgWrite.messageType = 105;
+                    msgWrite.status = 200;
+                    msgWrite.ticketNumber = ticketGiven;
+                    memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
+                    memcpy(msgWrite.data, char_hash, sizeof(char_hash));
+                    send(&msgWrite);
+                    exit(0);
+                } else {
+                    setFileInProgress(head, ticketGiven);
+                }
+
+                break;
+            case 2:
+                // Restituisco lo status del ticket
+                memcpy(msgWrite.senderId, serverId, sizeof(uuid_t));
+                memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
+
+                for (node *curr = head; curr != NULL; curr = curr->next) {
+                    if (curr->ticketNumber == msgRead.ticketNumber) {
+                        msgWrite.status = curr->status;
+                        break;
+                    }
+                }
+                if (msgWrite.status == 0) {
+                    strcpy(msgWrite.data, "In coda");
+                } else if (msgWrite.status == 1) {
+                    strcpy(msgWrite.data, "In calcolo");
+                } else if (msgWrite.status == 2) {
+                    strcpy(msgWrite.data, "Completato");
+                } else {
+                    msgWrite.status = 404;
+                    strcpy(msgWrite.data, "Ticket non trovato");
+                }
+
+                send(&msgWrite);
+
+                break;
+            case 105:
+                // IL SERVER HA TERMINATO IL CALCOLO DI SHA e se lo sta mandando al client
+                if (msgRead.status == 200) {
+                    // salva il risultato nella lista
+                    setFileHash(head, msgRead.ticketNumber, msgRead.data);
+
+                    node *clonedNode = malloc(sizeof(node));
+                    if (clonedNode) {
+                        if (getTicketById(msgRead.ticketNumber, head, clonedNode) == 0) {                            
+                            msgWrite.messageType = 103;
+                            msgWrite.ticketNumber = clonedNode->ticketNumber;
+                            memcpy(msgWrite.destinationId, clonedNode->clientId, sizeof(uuid_t));
+                            memcpy(msgWrite.data, clonedNode->hash, sizeof(clonedNode->hash));
+
+                            send(&msgWrite);
+                        }
+                        free(clonedNode);
+                    }
+                }
+
+        }
+        /**
         if(fork() == 0) {
             printf("[DEBUG] figlio aperto\n");
             // Elaboro messaggio e invio risposta
@@ -71,10 +314,10 @@ int main(int argc, char *argv[]) {
                         msgWrite.messageType = 101;
                         if (access(msgRead.data, F_OK) == 0) {
                             // [B] SI - Preparo il ticket incrementando il contatore
-                            ticketSystem++;
+                            ticketCounterSystem++;
                             msgWrite.status = 200;
-                            snprintf(msgWrite.data, sizeof(msgWrite.data), "%d", ticketSystem);
-                            printf("<Server> Ticket %d per il file %s\n", ticketSystem, msgRead.data);
+                            snprintf(msgWrite.data, sizeof(msgWrite.data), "%d", ticketCounterSystem);
+                            printf("<Server> Ticket %d per il file %s\n", ticketCounterSystem, msgRead.data);
                         } else {
                             // [C] NO - Preparo il messaggio di errore
                             msgWrite.status = 404;
@@ -91,7 +334,28 @@ int main(int argc, char *argv[]) {
                         send(&msgWrite);
                     
                     // [C] Invia il ticket al client
+
                     // [D] Calcolo SHA256 del file su questo figio
+
+                    if ( msgWrite.status == 200 ) {
+                        // Esegue SHA256 sul file richiesto
+                        digest_file(msgRead.data, hash);
+                        for(int i = 0; i < 32; i++) {
+                            sprintf(char_hash + (i * 2), "%02x", hash[i]);
+                        }
+                        printf("<Server> SHA256: %s\n", char_hash);
+
+                        // Invia il risultato al client
+                        msgWrite.messageType = 103; // Tipo di messaggio per la risposta con hash
+                        msgWrite.status = ticketCounterSystem; // old ticket
+                        strncpy(msgWrite.data, char_hash, sizeof(msgWrite.data) -1);
+                        msgWrite.data[sizeof(msgWrite.data) - 1] = '\0'; // Assicurarsi che sia null-terminated
+                    } else {
+                        // In caso di errore, non è previsto l'invio del messaggio di errore
+                    }
+
+                    send(&msgWrite);
+
                     // [E] Invio il ticket al client
                     
                     break;
@@ -104,7 +368,7 @@ int main(int argc, char *argv[]) {
             printf("[DEBUG] figlio chius0\n");
             exit(0);
         }
-
+         */
     }
 
     
