@@ -20,6 +20,7 @@ typedef struct node {
     int status; // 0 = in coda, 1 = in calcolo, 2 = completato
     uuid_t clientId;
     
+    long weight;
     char filePath[LEN];
     char hash[65];
 
@@ -60,8 +61,16 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
 
     // [3] Initialize new node
     (*ticketCounterSystem)++;
-    newNode->ticketNumber = *ticketCounterSystem;    // ticket number
+    newNode->ticketNumber = *ticketCounterSystem;   // ticket number
     newNode->status = 0;                            // 0 = in coda
+    newNode->weight = 0;                            // default weight
+    // calcolo il peso del file
+    struct stat fileStat;
+    if (stat(filePath, &fileStat) == 0) {
+        newNode->weight = fileStat.st_size;
+    } else {
+        perror("stat failed");
+    }
     uuid_copy(newNode->clientId, clientId);
     strncpy(newNode->filePath, filePath, LEN);
     newNode->filePath[LEN - 1] = '\0';              // Ensure null-termination
@@ -118,6 +127,20 @@ int getTicketById(int ticketNumber, node *head, node *toClone) {
     }
     memset(toClone, 0, sizeof(node));  // Not found, return empty node
     return -1;
+}
+
+int getTicketByWeight(node *head, node *toClone) {
+    // recupera il ticket con peso maggiore
+    node *current = head;
+    long maxWeight = -1;
+    while (current) {
+        if (current->weight > maxWeight) {
+            maxWeight = current->weight;
+            memcpy(toClone, current, sizeof(node));
+        }
+        current = current->next;
+    }
+    return maxWeight == -1 ? -1 : 0;
 }
 
 // TODO trovare un modo per dire al figlio la path da lavorare
