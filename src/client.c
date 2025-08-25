@@ -129,24 +129,6 @@ int main(int argc, char *argv[]) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
     printf("<Client> opening FIFO %s...\n", path2ClientFIFO);
 
     // [01] Creo fifo risposte x il srv (01 SRV)
@@ -165,7 +147,7 @@ int main(int argc, char *argv[]) {
 
         printf("\n");
         cont++;
-        printf("<> Ciclo numero: %d\n", cont);
+        printf("< Ciclo numero: %d >\n", cont);
         printf("\n");
 
 
@@ -197,7 +179,6 @@ int main(int argc, char *argv[]) {
         }
 
         // [06] Lettura della FIFO (03 SRV)
-        printf("\n\n\n");
         printStatus(linkedTickets);
         receive(clientId, &msgRead);
 

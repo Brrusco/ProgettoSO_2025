@@ -20,7 +20,10 @@ void send(struct Message *message){
     snprintf(fifoPath, sizeof(fifoPath), "%s%s", baseFIFOpath, uuid_str);
 
     // [2] Apro la FIFO in scrittura
-    printf("opening fifo on write : %s \n", fifoPath);
+
+     if(message->messageType !=5 && message->messageType !=105 && message->messageType != 201){
+        printf("opening fifo on write : %s \n", fifoPath);
+     }
     int fifoPointer = open(fifoPath, O_WRONLY);
     if (fifoPointer == -1) {
         printf("[ERROR] fifo : %s", fifoPath);
@@ -55,7 +58,7 @@ void send(struct Message *message){
             printf("[DEBUG] Invio richiesta di chiusura connessione a %s\n", fifoPath);
             break;
         case 5:
-            printf("[DEBUG] SND msg Client <-> Client \n");
+            //printf("[DEBUG] SND msg Client <-> Client \n");
             break;
         case 101:
             printf("[DEBUG] Invio risposta dal server in merito alla richiesta del file\n" );
@@ -64,7 +67,9 @@ void send(struct Message *message){
             printf("[DEBUG] Invio risposta dal server con hash del file\n");
             break;
         case 105:
-            printf("[DEBUG] msg Server <-> Server \n");
+            //printf("[DEBUG] SND msg Server <-> Server \n");
+            break;
+        case 201: // messagio thread ok
             break;
         default:
             fprintf(stderr, "<Error> Send : Tipo di messaggio sconosciuto: %d\n", message->messageType);
@@ -109,12 +114,15 @@ void receive(uuid_t idFifo, struct Message *msg){
     }
     
     // [4] Switch in base al tipo di messaggio per il client e il server
-    printf("┌───────────────────────────────────────┐\n");
-    printf("│ Risposta:\t\t\t\t│\n");
-    printf("│ MESSAGE TYPE: \t%d\t\t│\n", msg->messageType);
-    printf("│ STATUS: \t\t%d\t\t│\n", msg->status);
-    printf("│ DATA: \t\t%s\t\t│\n", msg->data);
-    printf("└───────────────────────────────────────┘\n");
+    if(msg->messageType !=5 && msg->messageType !=105 && msg->messageType != 201){
+        printf("┌───────────────────────────────────────┐\n");
+        printf("│ Risposta:\t\t\t\t│\n");
+        printf("│ MESSAGE TYPE: \t%d\t\t│\n", msg->messageType);
+        printf("│ STATUS: \t\t%d\t\t│\n", msg->status);
+        printf("│ DATA: \t\t%s\t\t│\n", msg->data);
+        printf("└───────────────────────────────────────┘\n");
+    }
+   
     switch (msg->messageType) {
         case 1:
             printf("[DEBUG] Ricevuto richiesta filePath a %s\n", fifoPath);
@@ -126,7 +134,7 @@ void receive(uuid_t idFifo, struct Message *msg){
             printf("[DEBUG] Ricevuto richiesta di chiusura connessione a %s\n", fifoPath);
             break;
         case 5:
-            printf("[DEBUG] RCV msg Client <-> Client \n");
+            //printf("[DEBUG] RCV msg Client <-> Client \n");
             break;
         case 101:
             printf("[DEBUG] Ricevuto risposta dal server in merito alla richiesta del file\n" );
@@ -135,7 +143,9 @@ void receive(uuid_t idFifo, struct Message *msg){
             printf("[DEBUG] Ricevuto hash del file\n");
             break;
         case 105:
-            printf("[DEBUG] msg Server <-> Server \n");
+            //printf("[DEBUG] RCV msg Server <-> Server \n");
+            break;
+        case 201: // messagio thread ok
             break;
         default:
             printf("<Error> Receive : Tipo di messaggio sconosciuto: %d\n", msg->messageType);

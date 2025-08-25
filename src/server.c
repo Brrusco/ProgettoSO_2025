@@ -8,12 +8,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <uuid/uuid.h>
+#include <pthread.h>
 
 #include "errExit.h"
 #include "SHA_256.h"
 #include "msg.h"
+#include "threadOp.h"
 
 #define LEN 256
+
+#define NUM_THREAD 10
 
 typedef struct node {
     int ticketNumber;
@@ -172,14 +176,20 @@ int main(int argc, char *argv[]) {
     printf("╚═══════════════════════════════════════╝\n");
     
     uuid_t serverId;
+    uuid_t threadId;
     uint8_t hash[32];
     char uuid_str[37];
     char char_hash[65];
     struct Message msgRead;
     struct Message msgWrite;
-    char path2ServerFIFO [LEN];    
+    char path2ServerFIFO [LEN];
+    char path2ThreadFIFO [LEN];   
     
     node *head = NULL;
+
+    pthread_t threads[NUM_THREAD];
+    struct ThreadData threadData;
+    int threadDisponibili = 0;
 
     int ticketCounterSystem;
     ticketCounterSystem = 0;
@@ -204,6 +214,38 @@ int main(int argc, char *argv[]) {
     } else {
         printf("<Server> FIFO %s creata!\n", path2ServerFIFO);
     }
+
+    
+
+    // [02] inizializzazione dei thread
+    uuid_generate(threadId);
+    uuid_unparse(threadId, uuid_str);
+    snprintf(path2ThreadFIFO, sizeof(path2ThreadFIFO), "%s%s", baseFIFOpath, uuid_str);
+
+    if (mkfifo(path2ServerFIFO, S_IRUSR | S_IWUSR | S_IWGRP) == -1) {
+        if (errno != EEXIST){
+            errExit("mkfifo failed");
+        } else {
+            printf("<Server> FIFO %s already exists, using it.\n", path2ThreadFIFO);
+        }
+    } else {
+        printf("<Server> FIFO %s creata!\n", path2ThreadFIFO);
+    }
+
+    memcpy(threadData.threadId, threadId, sizeof(uuid_t));
+
+    for (int i = 0; i < NUM_THREAD; i++) {
+        // Create the thread and execute the calculateSum function
+        if (pthread_create(&threads[i], NULL, threadOp, (void *)&threadData) != 0) {
+            errExit("Error creating thread");
+        }
+        receive(serverId,&msgRead);
+        if(msgRead.messageType == 201 && msgRead.status == 200){
+            threadDisponibili++;
+        }
+    }
+
+
 
     /** DEMO 
     printStatus(head);
@@ -232,7 +274,6 @@ int main(int argc, char *argv[]) {
                     msgWrite.status = 200;
                     msgWrite.ticketNumber = ticketGiven;
                     send(&msgWrite);
-                    
                 } else if (ticketGiven == -1) {
                     // file non esiste
                     msgWrite.status = 404;
@@ -290,10 +331,13 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 if (msgWrite.status == 0) {
+                    msgWrite.status = 200;
                     strcpy(msgWrite.data, "In coda");
                 } else if (msgWrite.status == 1) {
+                    msgWrite.status = 200;
                     strcpy(msgWrite.data, "In calcolo");
                 } else if (msgWrite.status == 2) {
+                    msgWrite.status = 200;
                     strcpy(msgWrite.data, "Completato");
                 } else {
                     msgWrite.status = 404;
