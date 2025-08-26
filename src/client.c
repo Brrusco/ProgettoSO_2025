@@ -127,10 +127,6 @@ int main(int argc, char *argv[]) {
     uuid_unparse(clientId, uuid_str);
     snprintf(path2ClientFIFO, sizeof(path2ClientFIFO), "%s%s", baseFIFOpath, uuid_str);
 
-
-
-    printf("<Client> opening FIFO %s...\n", path2ClientFIFO);
-
     // [01] Creo fifo risposte x il srv (01 SRV)
     if (mkfifo(path2ClientFIFO, S_IRUSR | S_IWUSR | S_IWGRP) == -1) {
         if (errno != EEXIST)
@@ -139,7 +135,7 @@ int main(int argc, char *argv[]) {
             printf("<Client> FIFO %s already exists, using it.\n", path2ClientFIFO);
     }
     else
-        printf("<Client> FIFO %s created!\n", path2ClientFIFO);
+        printf("<Client> FIFO %s creata!\n", path2ClientFIFO);
 
     msgRead.messageType = 5; // forzo il menu alla prima iterazione
 
@@ -148,7 +144,6 @@ int main(int argc, char *argv[]) {
         printf("\n");
         cont++;
         printf("< Ciclo numero: %d >\n", cont);
-        printf("\n");
 
 
         if(fork() == 0) {
@@ -184,12 +179,12 @@ int main(int argc, char *argv[]) {
 
 
         // Controllo il tipo di messaggio ricevuto
-        if (msgRead.messageType == 101 && msgRead.status == 200) {
+        if (msgRead.messageType == 101 && msgRead.status == 200) {      // 101: Server filePath confirm     // ACK dice ok ho ricevuto il path adesso (non?) calcolo lo SHA (non e ancora finito) e restituisce il ticket del processo SHA
             addIntToList(&linkedTickets, msgRead.ticketNumber);
             printStatus(linkedTickets);
         }
         
-        if (msgRead.messageType == 103 ) {
+        if (msgRead.messageType == 103 ) {                              // 3: Client FINACK                 // chiude la connessione tranquillamente
             removeIntFromList(&linkedTickets, msgRead.ticketNumber);
             printf("┌───────────────────────────────────────┐\n");
             printf("│ Hash calcolato:                       │\n");
@@ -198,9 +193,9 @@ int main(int argc, char *argv[]) {
             printStatus(linkedTickets);
         }
 
-        if (msgRead.messageType == 5 ) {
+        if (msgRead.messageType == 5 ) {                                // 5: Same Client to Same Client    // quando il figlio parla con il processo padre
             scelta = stringToInt(msgRead.data);
-            printf("\nCLIENT: RICEVE LA SCELTA %d\n", scelta);
+            //printf("\nCLIENT: RICEVE LA SCELTA %d\n", scelta);
 
             /*
             OPTIONS:
@@ -218,7 +213,7 @@ int main(int argc, char *argv[]) {
                     // Remove trailing newline if present
                     clientMessage[strcspn(clientMessage, "\n")] = 0;
 
-                    printf("\nCLIENT: CHIEDE IL FILE %s\n", clientMessage);
+                    //printf("\nCLIENT: CHIEDE IL FILE %s\n", clientMessage);
 
 
                     // [04] Creo il messaggio da inviare al server

@@ -8,10 +8,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <uuid/uuid.h>
+#include <sys/ipc.h>
 
 #include "errExit.h"
 #include "SHA_256.h"
 #include "msg.h"
+#include "semaforo.h"
+
 // Structure for shared data among threads
 struct ThreadData {
     uuid_t threadId; // condiviso tra tutti i threa d, e l'id della fifo su cui i thread fanno la receive , va definito dal server prima della creazione del thread
@@ -29,7 +32,6 @@ void *threadOp(void *arg){
     uuid_t serverId;
     memset(serverId, 0, sizeof(uuid_t)); // server id settato a 0
 
-
     msgWrite.messageType = 201;
     msgWrite.ticketNumber = 0;
     msgWrite.status = 200;
@@ -38,12 +40,21 @@ void *threadOp(void *arg){
     memcpy(msgWrite.data, "ok esisto", strlen("ok esisto") + 1);
     send(&msgWrite);                // scrive al server ok esisto
 
-    /*
-    while(msgRead.messageType != 104 ){
+    
+    key_t key = 1000;       // chiave dei semafori per i thread
+    int semaforoId = sem_init(key,1);       // richiedo un semaforo data la key (in creat : prendi o crea)
+    if(semaforoId == -1){
+        errExit("<Thread> Get semaforo fallita");
+    }
+    
+    do{
+        wait(semaforoId);
         receive(threadData->threadId, &msgRead);
+        signal(semaforoId);
         switch (msgRead.messageType) {
-            case 106:                   // il server ha inviato una richiesta SHA
-                // figlio (entra solo se ticketGive è maggiore di 0)
+            case 106:                   // 106: Server assegna ad un thread un filepath per calcolo SHA
+            printf("<Thread> file ricevuto : %s\n",msgRead.data);
+            
                 memset(hash, 0, sizeof(hash));
                 memset(char_hash, 0, sizeof(char_hash));
                 digest_file(msgRead.data, hash);
@@ -58,10 +69,11 @@ void *threadOp(void *arg){
                 memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.data, char_hash, sizeof(char_hash));
                 send(&msgWrite);
+              
             break;
             default:
                 errExit("<THREAD> RCV messaggio ricevuto non riconosciuto");
         }
-    }
-    */
+        
+    }while(msgRead.messageType != 104 );
 }

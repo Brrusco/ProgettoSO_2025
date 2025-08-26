@@ -13,5 +13,6 @@ void errExit(const char *msg) {
     printf("<errExit> removing FIFO...\n");
     if (unlink(path2ServerFIFO) != 0)
         printf("<errExit> unlink failed\n");
+    fflush(stdout);
     exit(1);
 }

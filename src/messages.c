@@ -21,8 +21,8 @@ void send(struct Message *message){
 
     // [2] Apro la FIFO in scrittura
 
-     if(message->messageType !=5 && message->messageType !=105 && message->messageType != 201){
-        printf("opening fifo on write : %s \n", fifoPath);
+     if(message->messageType !=5 && message->messageType !=105 && message->messageType != 201 && message->messageType != 106){
+        //printf("opening fifo on write : %s \n", fifoPath);
      }
     int fifoPointer = open(fifoPath, O_WRONLY);
     if (fifoPointer == -1) {
@@ -67,6 +67,9 @@ void send(struct Message *message){
             printf("[DEBUG] Invio risposta dal server con hash del file\n");
             break;
         case 105:
+            //printf("[DEBUG] SND msg Server <-> Server \n");
+            break;
+        case 106: // messaggio che il server usa per comunicare con i thread
             //printf("[DEBUG] SND msg Server <-> Server \n");
             break;
         case 201: // messagio thread ok
@@ -114,7 +117,7 @@ void receive(uuid_t idFifo, struct Message *msg){
     }
     
     // [4] Switch in base al tipo di messaggio per il client e il server
-    if(msg->messageType !=5 && msg->messageType !=105 && msg->messageType != 201){
+    if(msg->messageType !=5 && msg->messageType !=105 && msg->messageType != 201 && msg->messageType != 106){
         printf("┌───────────────────────────────────────┐\n");
         printf("│ Risposta:\t\t\t\t│\n");
         printf("│ MESSAGE TYPE: \t%d\t\t│\n", msg->messageType);
@@ -143,6 +146,9 @@ void receive(uuid_t idFifo, struct Message *msg){
             printf("[DEBUG] Ricevuto hash del file\n");
             break;
         case 105:
+            //printf("[DEBUG] RCV msg Server <-> Server \n");
+            break;
+        case 106: // messaggio che il server usa per comunicare con i thread
             //printf("[DEBUG] RCV msg Server <-> Server \n");
             break;
         case 201: // messagio thread ok

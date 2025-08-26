@@ -177,9 +177,9 @@ int main(int argc, char *argv[]) {
     
     uuid_t serverId;
     uuid_t threadId;
-    uint8_t hash[32];
     char uuid_str[37];
-    char char_hash[65];
+    //uint8_t hash[32];
+    //char char_hash[65];
     struct Message msgRead;
     struct Message msgWrite;
     char path2ServerFIFO [LEN];
@@ -214,15 +214,15 @@ int main(int argc, char *argv[]) {
     } else {
         printf("<Server> FIFO %s creata!\n", path2ServerFIFO);
     }
-
     
 
     // [02] inizializzazione dei thread
+    
     uuid_generate(threadId);
     uuid_unparse(threadId, uuid_str);
     snprintf(path2ThreadFIFO, sizeof(path2ThreadFIFO), "%s%s", baseFIFOpath, uuid_str);
 
-    if (mkfifo(path2ServerFIFO, S_IRUSR | S_IWUSR | S_IWGRP) == -1) {
+    if (mkfifo(path2ThreadFIFO, S_IRUSR | S_IWUSR | S_IWGRP) == -1) {
         if (errno != EEXIST){
             errExit("mkfifo failed");
         } else {
@@ -232,9 +232,10 @@ int main(int argc, char *argv[]) {
         printf("<Server> FIFO %s creata!\n", path2ThreadFIFO);
     }
 
+    
     memcpy(threadData.threadId, threadId, sizeof(uuid_t));
-
     for (int i = 0; i < NUM_THREAD; i++) {
+        //printf("thread #%d",i+1);
         // Create the thread and execute the calculateSum function
         if (pthread_create(&threads[i], NULL, threadOp, (void *)&threadData) != 0) {
             errExit("Error creating thread");
@@ -242,33 +243,24 @@ int main(int argc, char *argv[]) {
         receive(serverId,&msgRead);
         if(msgRead.messageType == 201 && msgRead.status == 200){
             threadDisponibili++;
+            //printf("\tok\n");
+            fflush(stdout);
+        }else{
+            errExit("Errore nella ricezione messaggio dal thread");
         }
     }
-
-
-
-    /** DEMO 
-    printStatus(head);
-    addFileInQueue(&head, &ticketCounterSystem, "lorem");
-    addFileInQueue(&head, &ticketCounterSystem, "pippo");
-    addFileInQueue(&head, &ticketCounterSystem, "pluto");
-    addFileInQueue(&head, &ticketCounterSystem, "paperino");
-    setFileInProgress(head, 1);
-    setFileHash(head, 1, "hash_value");
-    printStatus(head);
-    */
 
     while(1) {
         receive(serverId, &msgRead);
 
         switch (msgRead.messageType) {
-            case 1:
-                // INIZIO LA PROCEDURA E INVIO RISPOSTA
+            case 1:                                        // 1: Client filePathRequest        // assegna al server il path del file su cui calcolare SHA
+                // INIZIO LA PROCEDURA E INVIO RISPOSTA AL CLIENT
                 int ticketGiven = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId);
             
                 msgWrite.messageType = 101;
                 memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
-                memset(msgWrite.data, 0, sizeof(msgWrite.data));
+                strcpy(msgWrite.data, "path ricevuta");
                 if (ticketGiven > 0) {
                     // ok in coda
                     msgWrite.status = 200;
@@ -296,6 +288,14 @@ int main(int argc, char *argv[]) {
 
                 // CREO FIGLIO E INIZIO AD ELABORARE (SE FIGLI NON SONO OLTRE MAX)
                 // TODO: 
+                // MANDO MESSAGGIO AD UN THREAD CHE COMINCIA AD ELABORARE
+                msgWrite.messageType = 106;
+                msgWrite.status = 200;
+                msgWrite.ticketNumber = ticketGiven;
+                memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
+                memcpy(msgWrite.data, msgRead.data, sizeof(msgRead.data));
+                send(&msgWrite);
+                /* 
                 if (fork() == 0) {
                     // figlio (entra solo se ticketGive è maggiore di 0)
                     memset(hash, 0, sizeof(hash));
@@ -315,11 +315,13 @@ int main(int argc, char *argv[]) {
                     send(&msgWrite);
                     exit(0);
                 } else {
-                    setFileInProgress(head, ticketGiven);
+                    
                 }
+                */
+                setFileInProgress(head, ticketGiven);
 
                 break;
-            case 2:
+            case 2:                                                                 // 2: Client Ticket Status Request  // chiede lo stato o la posizione in coda
                 // Restituisco lo status del ticket
                 memcpy(msgWrite.senderId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
@@ -347,7 +349,7 @@ int main(int argc, char *argv[]) {
                 send(&msgWrite);
 
                 break;
-            case 105:
+            case 105:                                                                       // 105: Server to Server            // quando il figlio parla con il processo padre
                 // IL SERVER HA TERMINATO IL CALCOLO DI SHA e se lo sta mandando al client
                 if (msgRead.status == 200) {
                     // salva il risultato nella lista
@@ -457,6 +459,8 @@ int main(int argc, char *argv[]) {
     printf("<Server> removing FIFO...\n");
     if (unlink(path2ServerFIFO) != 0)
         errExit("unlink serverFIFO failed");
+    if (unlink(path2ThreadFIFO) != 0)
+        errExit("unlink threadFIFO failed");
 
     exit(0);
 }
