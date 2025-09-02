@@ -286,39 +286,26 @@ int main(int argc, char *argv[]) {
                     break;
                 }
 
-                // CREO FIGLIO E INIZIO AD ELABORARE (SE FIGLI NON SONO OLTRE MAX)
-                // TODO: 
                 // MANDO MESSAGGIO AD UN THREAD CHE COMINCIA AD ELABORARE
                 msgWrite.messageType = 106;
                 msgWrite.status = 200;
-                msgWrite.ticketNumber = ticketGiven;
-                memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
-                memcpy(msgWrite.data, msgRead.data, sizeof(msgRead.data));
-                send(&msgWrite);
-                /* 
-                if (fork() == 0) {
-                    // figlio (entra solo se ticketGive è maggiore di 0)
-                    memset(hash, 0, sizeof(hash));
-                    memset(char_hash, 0, sizeof(char_hash));
-
-                    digest_file(msgRead.data, hash);
-                    
-                    for(int i = 0; i < 32; i++) {
-                        sprintf(char_hash + (i * 2), "%02x", hash[i]);
-                    }
-                    // invio il risultato al server che poi lo gira a client
-                    msgWrite.messageType = 105;
-                    msgWrite.status = 200;
+                if (threadDisponibili > 0) {
                     msgWrite.ticketNumber = ticketGiven;
-                    memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
-                    memcpy(msgWrite.data, char_hash, sizeof(char_hash));
-                    send(&msgWrite);
-                    exit(0);
-                } else {
-                    
+                    memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
+                    memcpy(msgWrite.data, msgRead.data, sizeof(msgRead.data));
+                }else{
+                    // Se non ci sono thread disponibili mando in coda il primo ticket con priorità (peso maggiore)
+                    node *clonedNode = malloc(sizeof(node));
+                    msgWrite.ticketNumber = getTicketByWeight(&head, clonedNode);
+                    if (msgWrite.ticketNumber != -1) {
+                        // Se ho trovato un nodo valido, lo uso
+                        memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
+                        memcpy(msgWrite.data, clonedNode->filePath, sizeof(clonedNode->filePath));
+                    } else {
+                        errExit("Nessun nodo valido trovato E009");
+                    }
                 }
-                */
-                setFileInProgress(head, ticketGiven);
+                send(&msgWrite);
 
                 break;
             case 2:                                                                 // 2: Client Ticket Status Request  // chiede lo stato o la posizione in coda
@@ -349,7 +336,7 @@ int main(int argc, char *argv[]) {
                 send(&msgWrite);
 
                 break;
-            case 105:                                                                       // 105: Server to Server            // quando il figlio parla con il processo padre
+            case 105:                                                                       // 105: Server to Server
                 // IL SERVER HA TERMINATO IL CALCOLO DI SHA e se lo sta mandando al client
                 if (msgRead.status == 200) {
                     // salva il risultato nella lista
@@ -367,77 +354,15 @@ int main(int argc, char *argv[]) {
                         }
                         free(clonedNode);
                     }
+                    threadDisponibili++;
                 }
+                if (msgRead.status == 201) {
+                    setFileInProgress(head, msgRead.ticketNumber);
+                    threadDisponibili--;
+                }
+            break;
 
         }
-        /**
-        if(fork() == 0) {
-            printf("[DEBUG] figlio aperto\n");
-            // Elaboro messaggio e invio risposta
-            switch (msgRead.messageType) {
-                case 1:
-                    // Ricevo il path del file dal client e invia il ticket se il percorso è valido
-
-                    // [A] Il percorso è valido?
-                        memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
-                        msgWrite.messageType = 101;
-                        if (access(msgRead.data, F_OK) == 0) {
-                            // [B] SI - Preparo il ticket incrementando il contatore
-                            ticketCounterSystem++;
-                            msgWrite.status = 200;
-                            snprintf(msgWrite.data, sizeof(msgWrite.data), "%d", ticketCounterSystem);
-                            printf("<Server> Ticket %d per il file %s\n", ticketCounterSystem, msgRead.data);
-                        } else {
-                            // [C] NO - Preparo il messaggio di errore
-                            msgWrite.status = 404;
-                            int written = snprintf(msgWrite.data, sizeof(msgWrite.data), "File %s non trovato", msgRead.data);
-                            // Check for truncation and ensure null-termination
-                            if (written < 0 || written >= (int)sizeof(msgWrite.data)) {
-                                // Truncated, ensure null-termination and optionally log warning
-                                msgWrite.data[sizeof(msgWrite.data) - 1] = '\0';
-                                // Optionally log: fprintf(stderr, "Warning: msgWrite.data truncated.\n");
-                            }
-                            printf("<Server> Errore: %s\n", msgWrite.data);
-                        }
-
-                        send(&msgWrite);
-                    
-                    // [C] Invia il ticket al client
-
-                    // [D] Calcolo SHA256 del file su questo figio
-
-                    if ( msgWrite.status == 200 ) {
-                        // Esegue SHA256 sul file richiesto
-                        digest_file(msgRead.data, hash);
-                        for(int i = 0; i < 32; i++) {
-                            sprintf(char_hash + (i * 2), "%02x", hash[i]);
-                        }
-                        printf("<Server> SHA256: %s\n", char_hash);
-
-                        // Invia il risultato al client
-                        msgWrite.messageType = 103; // Tipo di messaggio per la risposta con hash
-                        msgWrite.status = ticketCounterSystem; // old ticket
-                        strncpy(msgWrite.data, char_hash, sizeof(msgWrite.data) -1);
-                        msgWrite.data[sizeof(msgWrite.data) - 1] = '\0'; // Assicurarsi che sia null-terminated
-                    } else {
-                        // In caso di errore, non è previsto l'invio del messaggio di errore
-                    }
-
-                    send(&msgWrite);
-
-                    // [E] Invio il ticket al client
-                    
-                    break;
-                    case 2: 
-                        break;
-                    default: break;
-            }
-
-            // Chiudo il figlio
-            printf("[DEBUG] figlio chius0\n");
-            exit(0);
-        }
-         */
     }
 
     

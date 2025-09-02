@@ -36,6 +36,7 @@ struct Message {
  * 
  * Status types :
  * 200: ok
+ * 201: ticket in elaborazione
  * 404: file non trovato
  * 405: in elaborazione
  * 406: in cache 

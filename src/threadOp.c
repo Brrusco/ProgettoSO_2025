@@ -53,7 +53,13 @@ void *threadOp(void *arg){
         signal(semaforoId);
         switch (msgRead.messageType) {
             case 106:                   // 106: Server assegna ad un thread un filepath per calcolo SHA
-            printf("<Thread> file ricevuto : %s\n",msgRead.data);
+                printf("<Thread> file ricevuto : %s\n",msgRead.data);
+
+                // Comunico al server ch inizio a lavorare
+                msgWrite.messageType = 105;
+                msgWrite.ticketNumber = msgRead.ticketNumber;
+                msgWrite.status = 201;
+                send(&msgWrite);
             
                 memset(hash, 0, sizeof(hash));
                 memset(char_hash, 0, sizeof(char_hash));
