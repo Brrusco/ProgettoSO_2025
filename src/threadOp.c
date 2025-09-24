@@ -37,8 +37,8 @@ void *threadOp(void *arg){
     msgWrite.status = 200;
     memcpy(msgWrite.senderId, threadData->threadId, sizeof(uuid_t));
     memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
-    memcpy(msgWrite.data, "ok esisto", strlen("ok esisto") + 1);
-    send(&msgWrite);                // scrive al server ok esisto
+    memcpy(msgWrite.data, "thread creato", strlen("thread creato") + 1);
+    send(&msgWrite);                // scrive al server thread creato
 
     
     key_t key = 1000;       // chiave dei semafori per i thread
@@ -58,6 +58,7 @@ void *threadOp(void *arg){
                 // Comunico al server ch inizio a lavorare
                 msgWrite.messageType = 105;
                 msgWrite.ticketNumber = msgRead.ticketNumber;
+                memcpy(msgWrite.data, "thread ticket assign", strlen("thread ticket assign") + 1);
                 msgWrite.status = 201;
                 send(&msgWrite);
             
@@ -74,11 +75,13 @@ void *threadOp(void *arg){
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.data, char_hash, sizeof(char_hash));
+                sleep(1);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
+                printf("<Thread> file : %s  - DONE - Hash : %s\n",msgRead.data,char_hash);
                 send(&msgWrite);
               
             break;
             default:
-                errExit("<THREAD> RCV messaggio ricevuto non riconosciuto");
+                errExit("<Thread> RCV messaggio ricevuto non riconosciuto");
         }
         
     }while(msgRead.messageType != 104 );

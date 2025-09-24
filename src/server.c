@@ -32,7 +32,7 @@ typedef struct node {
     struct node *next;
 } node;
 
-int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, uuid_t clientId) {
+int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, uuid_t clientId, char *hash) {
 
     // [0] Check memory allocation
     node *newNode = malloc(sizeof(node));
@@ -52,11 +52,13 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
     node *current = *head;
     while (current) {
         if (strcmp(current->filePath, filePath) == 0) {
-            fprintf(stderr, "File %s is already in the queue\n", filePath);
             free(newNode);
             if (current->status == 2) {
+                printf("Hash per file %s è gia stato computato , lo restituisco\n", filePath);
+                strcpy(hash, current->hash);
                 return -3; // already computed
             } else {
+                printf("Hash per file %s è in calcolamento\n", filePath);
                 return -2; // already in queue or in progress
             }
         }
@@ -179,7 +181,7 @@ int main(int argc, char *argv[]) {
     uuid_t threadId;
     char uuid_str[37];
     //uint8_t hash[32];
-    //char char_hash[65];
+    char char_hash[65];
     struct Message msgRead;
     struct Message msgWrite;
     char path2ServerFIFO [LEN];
@@ -197,6 +199,7 @@ int main(int argc, char *argv[]) {
     memset(serverId, 0, sizeof(uuid_t));
     
     msgWrite.status = 0;
+    msgWrite.ticketNumber = 0;
     strcpy(msgWrite.data, "");
     memcpy(msgWrite.senderId, serverId, sizeof(uuid_t));
     
@@ -256,7 +259,7 @@ int main(int argc, char *argv[]) {
         switch (msgRead.messageType) {
             case 1:                                        // 1: Client filePathRequest        // assegna al server il path del file su cui calcolare SHA
                 // INIZIO LA PROCEDURA E INVIO RISPOSTA AL CLIENT
-                int ticketGiven = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId);
+                int ticketGiven = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId, char_hash);
             
                 msgWrite.messageType = 101;
                 memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
@@ -279,9 +282,11 @@ int main(int argc, char *argv[]) {
                     send(&msgWrite);
                     break;
                 } else if (ticketGiven == -3) {
-                    // file già calcolato
+                    // file già calcolato -> restituisco hash gia calcolato
                     msgWrite.status = 406;
                     msgWrite.ticketNumber = ticketGiven;
+                    memcpy(msgWrite.data, &char_hash, sizeof(char_hash));
+                    sleep(1);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
                     send(&msgWrite);
                     break;
                 }
@@ -336,8 +341,8 @@ int main(int argc, char *argv[]) {
                 send(&msgWrite);
 
                 break;
-            case 105:                                                                       // 105: Server to Server
-                // IL SERVER HA TERMINATO IL CALCOLO DI SHA e se lo sta mandando al client
+            case 105:                                                                       // 105: Thread to Server
+                // IL THREAD HA TERMINATO IL CALCOLO DI SHA e se lo sta mandando al client
                 if (msgRead.status == 200) {
                     // salva il risultato nella lista
                     setFileHash(head, msgRead.ticketNumber, msgRead.data);
@@ -349,7 +354,6 @@ int main(int argc, char *argv[]) {
                             msgWrite.ticketNumber = clonedNode->ticketNumber;
                             memcpy(msgWrite.destinationId, clonedNode->clientId, sizeof(uuid_t));
                             memcpy(msgWrite.data, clonedNode->hash, sizeof(clonedNode->hash));
-
                             send(&msgWrite);
                         }
                         free(clonedNode);

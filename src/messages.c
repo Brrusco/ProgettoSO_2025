@@ -26,19 +26,19 @@ void send(struct Message *message){
      }
     int fifoPointer = open(fifoPath, O_WRONLY);
     if (fifoPointer == -1) {
-        printf("[ERROR] fifo : %s", fifoPath);
-        printf("[ERROR] Probabile processo non avviato \n");
-        errExit("[ERROR] Send : open fifo failed\n");
+        printf("[MSG ERROR] fifo : %s", fifoPath);
+        printf("[MSG ERROR] Probabile processo non avviato \n");
+        errExit("[MSG ERROR] Send : open fifo failed\n");
     }
 
     // [3] Scrive nella FIFO se esiste
     if (write(fifoPointer, message, sizeof(struct Message)) != sizeof(struct Message)){
         if (errno == ENOENT) {
-            printf("[ERROR] fifo : %s", fifoPath);
-            errExit("[ERROR] Send : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
+            printf("[MSG ERROR] fifo : %s", fifoPath);
+            errExit("[MSG ERROR] Send : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
         } else {
             printf("fifo : %s", fifoPath);
-            errExit("[ERROR] Send : write on fifo failed\n");
+            errExit("[MSG ERROR] Send : write on fifo failed\n");
         }
     }
 
@@ -46,31 +46,31 @@ void send(struct Message *message){
     // [4] Switch in base al tipo di messaggio
     switch (message->messageType) {
         case 0:
-            printf("[DEBUG] Invio richiesta ID client a %s\n", fifoPath);
+            //printf("[MSG DEBUG] Invio richiesta ID client a %s\n", fifoPath);
             break;
         case 1:
-            printf("[DEBUG] Invio richiesta filePath a %s\n", fifoPath);
+            //printf("[MSG DEBUG] Invio richiesta filePath a %s\n", fifoPath);
             break;
         case 2:
-            printf("[DEBUG] Invio richiesta stato ticket a %s\n", fifoPath);
+            printf("[MSG DEBUG] Invio richiesta stato ticket a %s\n", fifoPath);
             break;
         case 3:
-            printf("[DEBUG] Invio richiesta di chiusura connessione a %s\n", fifoPath);
+            printf("[MSG DEBUG] Invio richiesta di chiusura connessione a %s\n", fifoPath);
             break;
         case 5:
-            //printf("[DEBUG] SND msg Client <-> Client \n");
+            //printf("[MSG DEBUG] SND msg Client <-> Client \n");
             break;
         case 101:
-            printf("[DEBUG] Invio risposta dal server in merito alla richiesta del file\n" );
+            //printf("[MSG DEBUG] Invio risposta dal server in merito alla richiesta del file\n" );
             break;
         case 103:
-            printf("[DEBUG] Invio risposta dal server con hash del file\n");
+            //printf("[MSG DEBUG] Invio risposta dal server con hash del file\n");
             break;
         case 105:
-            //printf("[DEBUG] SND msg Server <-> Server \n");
+            //printf("[MSG DEBUG] SND msg Server <-> Server \n");
             break;
         case 106: // messaggio che il server usa per comunicare con i thread
-            //printf("[DEBUG] SND msg Server <-> Server \n");
+            //printf("[MSG DEBUG] SND msg Server <-> Server \n");
             break;
         case 201: // messagio thread ok
             break;
@@ -81,8 +81,8 @@ void send(struct Message *message){
     
     // [5] Chiudo la FIFO (non distrugge)
     if (close(fifoPointer) != 0){
-        printf("[ERROR] fifo : %s", fifoPath);
-        errExit("[ERROR] Send : close fifo failed");
+        printf("[MSG ERROR] fifo : %s", fifoPath);
+        errExit("[MSG ERROR] Send : close fifo failed");
     }
         
 }
@@ -98,58 +98,59 @@ void receive(uuid_t idFifo, struct Message *msg){
     snprintf(fifoPath, sizeof(fifoPath), "%s%s", baseFIFOpath, uuid_str);
     
     // [2] Apro la FIFO in lettura
-    //printf("[DEBUG] opening fifo on read : %s \n", fifoPath);
+    //printf("[MSG DEBUG] opening fifo on read : %s \n", fifoPath);
     fifoPointer = open(fifoPath, O_RDONLY);
     if (fifoPointer == -1) {
-        printf("[ERROR] fifo : %s", fifoPath);
-        errExit("[ERROR] Receive : open fifo failed");
+        printf("[MSG ERROR] fifo : %s", fifoPath);
+        errExit("[MSG ERROR] Receive : open fifo failed");
     }       
      
     // [3] Legge la fifo e attende i messaggi
     if(read(fifoPointer, msg, sizeof(struct Message)) != sizeof(struct Message)){
         if (errno == ENOENT) {
-            printf("[ERROR] fifo : %s", fifoPath);
-            errExit("[ERROR] Receive : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
+            printf("[MSG ERROR] fifo : %s", fifoPath);
+            errExit("[MSG ERROR] Receive : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
         } else {
             printf("fifo : %s", fifoPath);
-            errExit("[ERROR] Receive : read on fifo failed");
+            errExit("[MSG ERROR] Receive : read on fifo failed");
         }
     }
     
     // [4] Switch in base al tipo di messaggio per il client e il server
-    if(msg->messageType !=5 && msg->messageType !=105 && msg->messageType != 201 && msg->messageType != 106){
-        printf("┌───────────────────────────────────────┐\n");
-        printf("│ Risposta:\t\t\t\t│\n");
-        printf("│ MESSAGE TYPE: \t%d\t\t│\n", msg->messageType);
-        printf("│ STATUS: \t\t%d\t\t│\n", msg->status);
-        printf("│ DATA: \t\t%s\t\t│\n", msg->data);
-        printf("└───────────────────────────────────────┘\n");
+    if(msg->messageType == 1 || (msg->status %100) != 0){
+        printf("┌────────────────────────────────────────────────────────────────────────┐\n");
+        printf("│ %-70s │\n", "Risposta Ricevuta:");
+        printf("│ MESSAGE TYPE: %-56d │\n", msg->messageType);
+        printf("│ STATUS: %-62d │\n", msg->status);
+        printf("│ DATA: %-64s │\n", msg->data);
+        (msg->ticketNumber > 0) ? printf("│ TICKET: %-62d │\n", msg->ticketNumber) : (void)0; // se ticket number > 0 lo stampa
+        printf("└────────────────────────────────────────────────────────────────────────┘\n");
     }
    
     switch (msg->messageType) {
         case 1:
-            printf("[DEBUG] Ricevuto richiesta filePath a %s\n", fifoPath);
+            //printf("[MSG DEBUG] Ricevuto richiesta filePath a %s\n", fifoPath);
             break;
         case 2:
-            printf("[DEBUG] Ricevuto richiesta stato ticket a %s\n", fifoPath);
+            printf("[MSG DEBUG] Ricevuto richiesta stato ticket a %s\n", fifoPath);
             break;
         case 3:
-            printf("[DEBUG] Ricevuto richiesta di chiusura connessione a %s\n", fifoPath);
+            printf("[MSG DEBUG] Ricevuto richiesta di chiusura connessione a %s\n", fifoPath);
             break;
         case 5:
-            //printf("[DEBUG] RCV msg Client <-> Client \n");
+            //printf("[MSG DEBUG] RCV msg Client <-> Client \n");
             break;
         case 101:
-            printf("[DEBUG] Ricevuto risposta dal server in merito alla richiesta del file\n" );
+            //printf("[MSG DEBUG] Ricevuto risposta dal server in merito alla richiesta del file\n" );
             break;
         case 103:
-            printf("[DEBUG] Ricevuto hash del file\n");
+            //printf("[MSG DEBUG] Ricevuto hash del file\n");
             break;
         case 105:
-            //printf("[DEBUG] RCV msg Server <-> Server \n");
+            //printf("[MSG DEBUG] RCV msg Server <-> Server \n");
             break;
         case 106: // messaggio che il server usa per comunicare con i thread
-            //printf("[DEBUG] RCV msg Server <-> Server \n");
+            //printf("[MSG DEBUG] RCV msg Server <-> Server \n");
             break;
         case 201: // messagio thread ok
             break;
@@ -161,7 +162,7 @@ void receive(uuid_t idFifo, struct Message *msg){
         
     // [5] Chiudo la FIFO (non distrugge)
     if (close(fifoPointer) != 0){
-        printf("[ERROR] fifo : %s", fifoPath);
-        errExit("[ERROR] close fifo failed");
+        printf("[MSG ERROR] fifo : %s", fifoPath);
+        errExit("[MSG ERROR] close fifo failed");
     }  
 }

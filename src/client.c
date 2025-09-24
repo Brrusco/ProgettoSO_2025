@@ -113,6 +113,8 @@ int main(int argc, char *argv[]) {
     int exitCode;
     int cont=0;
 
+    msgWrite.ticketNumber = 0;
+
     exitCode = 1;
     node *linkedTickets = NULL;
 
@@ -130,7 +132,7 @@ int main(int argc, char *argv[]) {
     // [01] Creo fifo risposte x il srv (01 SRV)
     if (mkfifo(path2ClientFIFO, S_IRUSR | S_IWUSR | S_IWGRP) == -1) {
         if (errno != EEXIST)
-            errExit("[ERROR] mkfifo clientFIFO failed");
+            errExit("<Client> Error : mkfifo clientFIFO failed");
         else
             printf("<Client> FIFO %s already exists, using it.\n", path2ClientFIFO);
     }
@@ -143,7 +145,9 @@ int main(int argc, char *argv[]) {
 
         printf("\n");
         cont++;
-        printf("< Ciclo numero: %d >\n", cont);
+        printf("%-40s", "────────────────────────────────────────");
+        printf("< Ciclo numero: %d >", cont);
+        printf("%-40s\n", "────────────────────────────────────────");
 
 
         if(fork() == 0) {
@@ -184,12 +188,12 @@ int main(int argc, char *argv[]) {
             printStatus(linkedTickets);
         }
         
-        if (msgRead.messageType == 103 ) {                              // 3: Client FINACK                 // chiude la connessione tranquillamente
+        if (msgRead.messageType == 103  || msgRead.messageType == 105) {                              // 3: Client FINACK                 // chiude la connessione tranquillamente
             removeIntFromList(&linkedTickets, msgRead.ticketNumber);
-            printf("┌───────────────────────────────────────┐\n");
-            printf("│ Hash calcolato:                       │\n");
-            printf("│ %s │\n", msgRead.data);
-            printf("└───────────────────────────────────────┘\n");
+            printf("┌────────────────────────────────────────────────────────────────────────┐\n");
+            printf("│ %-70s │\n", "Hash calcolato:");
+            printf("│ %-70s │\n", msgRead.data);
+            printf("└────────────────────────────────────────────────────────────────────────┘\n");
             printStatus(linkedTickets);
         }
 
@@ -245,7 +249,7 @@ int main(int argc, char *argv[]) {
                     scelta = 0;
                     break;
                 case 3:
-                    // Chiudi il filgio e il client
+                    // Chiudi il figlio e il client
                     printf("<Client> Chiudo il client.\n");
                     exitCode = 0;
                     break;
@@ -254,16 +258,6 @@ int main(int argc, char *argv[]) {
                     break;
             }
         }
-
-
-
-        
-
-
-
-
-        
-
     }
    
     if (unlink(path2ClientFIFO) != 0)
