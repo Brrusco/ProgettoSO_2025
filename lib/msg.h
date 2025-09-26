@@ -33,6 +33,8 @@ struct Message {
  * 
  * message thread types : 
  * 201: thread conferma la propria esistenza al server
+ * 202: thread risponde con conferma presa in carico del lavoro
+ * 203: thread consegna al server l'hash calcolato
  * 
  * Status types :
  * 200: ok

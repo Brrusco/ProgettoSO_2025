@@ -74,6 +74,10 @@ void send(struct Message *message){
             break;
         case 201: // messagio thread ok
             break;
+        case 202: // messagio thread confirm job
+            break;
+        case 203: // messagio thread hash done
+            break;
         default:
             fprintf(stderr, "<Error> Send : Tipo di messaggio sconosciuto: %d\n", message->messageType);
             return;
@@ -153,6 +157,10 @@ void receive(uuid_t idFifo, struct Message *msg){
             //printf("[MSG DEBUG] RCV msg Server <-> Server \n");
             break;
         case 201: // messagio thread ok
+            break;
+        case 202: // messagio thread confirm job
+            break;
+        case 203: // messagio thread hash done
             break;
         default:
             printf("<Error> Receive : Tipo di messaggio sconosciuto: %d\n", msg->messageType);

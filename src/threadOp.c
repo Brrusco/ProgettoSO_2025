@@ -56,10 +56,10 @@ void *threadOp(void *arg){
                 printf("<Thread> file ricevuto : %s\n",msgRead.data);
 
                 // Comunico al server ch inizio a lavorare
-                msgWrite.messageType = 105;
+                msgWrite.messageType = 202;
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.data, "thread ticket assign", strlen("thread ticket assign") + 1);
-                msgWrite.status = 201;
+                msgWrite.status = 200;
                 send(&msgWrite);
             
                 memset(hash, 0, sizeof(hash));
@@ -70,7 +70,7 @@ void *threadOp(void *arg){
                     sprintf(char_hash + (i * 2), "%02x", hash[i]);
                 }
                 // invio il risultato al server che poi lo gira a client
-                msgWrite.messageType = 105;
+                msgWrite.messageType = 203;
                 msgWrite.status = 200;
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));

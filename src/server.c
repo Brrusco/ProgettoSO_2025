@@ -16,13 +16,19 @@
 #include "threadOp.h"
 
 #define LEN 256
-
 #define NUM_THREAD 10
+
+char uuid_str[37];
+
+typedef struct clientNode{
+    uuid_t clientId;
+    struct clientNode *next;
+} clientNode;
 
 typedef struct node {
     int ticketNumber;
     int status; // 0 = in coda, 1 = in calcolo, 2 = completato
-    uuid_t clientId;
+    clientNode *clientHead;
     
     long weight;
     char filePath[LEN];
@@ -32,12 +38,47 @@ typedef struct node {
     struct node *next;
 } node;
 
+
+void addClient(clientNode **clientHead, uuid_t clientId){
+    clientNode *newNode = malloc(sizeof(clientNode));
+    if (!newNode) {
+        perror("Errore : fallita allocazione memoria per clientNode");
+    }
+    uuid_copy(newNode->clientId, clientId);
+    newNode->next = NULL;
+    
+    if (*clientHead == NULL) {
+        *clientHead = newNode;
+    } else {
+        clientNode *current = *clientHead;
+        while (current->next) {
+            current = current->next;
+        }
+        current->next = newNode;
+    }
+
+}
+
+void stampaClientList(clientNode **clientHead){
+    clientNode *current = *clientHead;
+    char uuid_str[37];
+    printf("stampando Client\n");
+    fflush(stdout);
+    while (current) {
+        uuid_unparse(current->clientId, uuid_str);
+        printf("Client: %s\n", uuid_str);
+        fflush(stdout);
+        current = current->next;
+    }
+}
+
+
 int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, uuid_t clientId, char *hash) {
 
     // [0] Check memory allocation
     node *newNode = malloc(sizeof(node));
     if (!newNode) {
-        perror("Failed to allocate memory");
+        perror("Errore : fallita allocazione memoria per node");
         return -1;
     }
 
@@ -77,7 +118,8 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
     } else {
         perror("stat failed");
     }
-    uuid_copy(newNode->clientId, clientId);
+    newNode->clientHead = NULL;
+    addClient(&newNode->clientHead, clientId);
     strncpy(newNode->filePath, filePath, LEN);
     newNode->filePath[LEN - 1] = '\0';              // Ensure null-termination
     newNode->next = NULL;
@@ -122,7 +164,10 @@ int setFileHash(node *head, const int ticketNumber, const char *hash) {
     return -1;  // File not found
 }
 
-int getTicketById(int ticketNumber, node *head, node *toClone) {
+/*
+ * dato ticket Number restituisce in toClone la copia del nodo con dato ticket 
+ */
+int getTicketById(int ticketNumber, node *head, node *toClone) {  // 0 se success , -1 se fail
     node *current = head;
     while (current) {
         if (current->ticketNumber == ticketNumber) {
@@ -149,7 +194,6 @@ int getTicketByWeight(node *head, node *toClone) {
     return maxWeight == -1 ? -1 : 0;
 }
 
-// TODO trovare un modo per dire al figlio la path da lavorare
 
 void printStatus(node *linkedTicketList) {
     printf("┌────────┬──────────────────────────────┐\n");
@@ -185,9 +229,12 @@ int main(int argc, char *argv[]) {
     struct Message msgRead;
     struct Message msgWrite;
     char path2ServerFIFO [LEN];
-    char path2ThreadFIFO [LEN];   
+    char path2ThreadFIFO [LEN]; 
     
     node *head = NULL;
+
+    node *clonedNode = malloc(sizeof(node));
+    clientNode *currentClient;
 
     pthread_t threads[NUM_THREAD];
     struct ThreadData threadData;
@@ -257,28 +304,36 @@ int main(int argc, char *argv[]) {
         receive(serverId, &msgRead);
 
         switch (msgRead.messageType) {
+            //messaggi client -> server
             case 1:                                        // 1: Client filePathRequest        // assegna al server il path del file su cui calcolare SHA
                 // INIZIO LA PROCEDURA E INVIO RISPOSTA AL CLIENT
                 int ticketGiven = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId, char_hash);
             
                 msgWrite.messageType = 101;
                 memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
-                strcpy(msgWrite.data, "path ricevuta");
                 if (ticketGiven > 0) {
                     // ok in coda
                     msgWrite.status = 200;
                     msgWrite.ticketNumber = ticketGiven;
+                    strcpy(msgWrite.data, "path ricevuta");
                     send(&msgWrite);
                 } else if (ticketGiven == -1) {
                     // file non esiste
                     msgWrite.status = 404;
                     msgWrite.ticketNumber = ticketGiven;
+                    strcpy(msgWrite.data, "file inesistente");
                     send(&msgWrite);
                     break;
                 } else if (ticketGiven == -2) {
                     // file già in coda o in calcolo
                     msgWrite.status = 405;
                     msgWrite.ticketNumber = ticketGiven;
+                    strcpy(msgWrite.data, "path ricevuta, aggiunto a coda richieste");
+                    /*
+                    if (getTicketById(msgRead.ticketNumber, head, clonedNode) == 0) {
+                        addClient();
+                    }
+                    */
                     send(&msgWrite);
                     break;
                 } else if (ticketGiven == -3) {
@@ -341,29 +396,34 @@ int main(int argc, char *argv[]) {
                 send(&msgWrite);
 
                 break;
-            case 105:                                                                       // 105: Thread to Server
-                // IL THREAD HA TERMINATO IL CALCOLO DI SHA e se lo sta mandando al client
-                if (msgRead.status == 200) {
-                    // salva il risultato nella lista
-                    setFileHash(head, msgRead.ticketNumber, msgRead.data);
+            //messaggi thread -> server
+            case 202:                                                                       // thread conferma presa in carico lavoro
+                setFileInProgress(head, msgRead.ticketNumber);
+                threadDisponibili--;
+            break;
 
-                    node *clonedNode = malloc(sizeof(node));
-                    if (clonedNode) {
-                        if (getTicketById(msgRead.ticketNumber, head, clonedNode) == 0) {                            
-                            msgWrite.messageType = 103;
-                            msgWrite.ticketNumber = clonedNode->ticketNumber;
-                            memcpy(msgWrite.destinationId, clonedNode->clientId, sizeof(uuid_t));
-                            memcpy(msgWrite.data, clonedNode->hash, sizeof(clonedNode->hash));
+            case 203:                                                                       // thread consegna hash calcolato
+                // IL THREAD HA TERMINATO IL CALCOLO DI SHA e server lo sta mandando al client
+                // salva il risultato nella lista
+                setFileHash(head, msgRead.ticketNumber, msgRead.data);
+                if (clonedNode) {
+                    if (getTicketById(msgRead.ticketNumber, head, clonedNode) == 0) {        // copia in cloneNode il nodo della lista con il ticket corrispondente      
+                        currentClient = clonedNode->clientHead;            
+                        msgWrite.messageType = 103;
+                        msgWrite.ticketNumber = clonedNode->ticketNumber;
+                        memcpy(msgWrite.data, clonedNode->hash, sizeof(clonedNode->hash));
+                        do{
+                            uuid_unparse(currentClient->clientId, uuid_str);
+                            printf("invio risposta a : ");
+                            printf("%s\n", uuid_str);
+                            memcpy(msgWrite.destinationId, currentClient->clientId, sizeof(uuid_t));
                             send(&msgWrite);
-                        }
-                        free(clonedNode);
+                            currentClient = currentClient->next;
+                        }while(currentClient != NULL);
                     }
-                    threadDisponibili++;
+                    free(clonedNode);
                 }
-                if (msgRead.status == 201) {
-                    setFileInProgress(head, msgRead.ticketNumber);
-                    threadDisponibili--;
-                }
+                threadDisponibili++;
             break;
 
         }
