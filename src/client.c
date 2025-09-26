@@ -139,29 +139,25 @@ int main(int argc, char *argv[]) {
     else
         printf("<Client> FIFO %s creata!\n", path2ClientFIFO);
 
+    printf("%-40s", "────────────────────────────────────────");
+    printf("< Ciclo numero: %d >", cont);
+    printf("%-40s\n", "────────────────────────────────────────");
+    printMenu();
+    
     msgRead.messageType = 5; // forzo il menu alla prima iterazione
-
     while(1 && exitCode){
 
-        printf("\n");
-        cont++;
-        printf("%-40s", "────────────────────────────────────────");
-        printf("< Ciclo numero: %d >", cont);
-        printf("%-40s\n", "────────────────────────────────────────");
-
-
-        if(fork() == 0) {
-            // Stampo il menu
-
-            if (msgRead.messageType != 5) {
-                // Il menu è scatenato solo dopo che riceve una scelta.
-                // La prima scelta è scatenata artificialmente
-                exit(0);
-            }
-
-            char scelta[2];
-            
+        if(msgRead.messageType != 5){
+            printf("\n");
+            cont++;
+            printf("%-40s", "────────────────────────────────────────");
+            printf("< Ciclo numero: %d >", cont);
+            printf("%-40s\n", "────────────────────────────────────────");
+            printStatus(linkedTickets);
             printMenu();
+        }else{
+            if(fork() == 0) {
+            char scelta[2];
 
             memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
             memcpy(msgWrite.destinationId, clientId, sizeof(uuid_t));
@@ -176,16 +172,16 @@ int main(int argc, char *argv[]) {
             // Chiudo il figlio
             exit(0);
         }
+        }
+        
 
         // [06] Lettura della FIFO (03 SRV)
-        printStatus(linkedTickets);
         receive(clientId, &msgRead);
 
 
         // Controllo il tipo di messaggio ricevuto
         if (msgRead.messageType == 101 && msgRead.status == 200) {      // 101: Server filePath confirm     // ACK dice ok ho ricevuto il path adesso (non?) calcolo lo SHA (non e ancora finito) e restituisce il ticket del processo SHA
             addIntToList(&linkedTickets, msgRead.ticketNumber);
-            printStatus(linkedTickets);
         }
         
         if (msgRead.messageType == 103  || msgRead.messageType == 105) {                              // 3: Client FINACK                 // chiude la connessione tranquillamente
@@ -194,13 +190,10 @@ int main(int argc, char *argv[]) {
             printf("│ %-70s │\n", "Hash calcolato:");
             printf("│ %-70s │\n", msgRead.data);
             printf("└────────────────────────────────────────────────────────────────────────┘\n");
-            printStatus(linkedTickets);
         }
 
         if (msgRead.messageType == 5 ) {                                // 5: Same Client to Same Client    // quando il figlio parla con il processo padre
             scelta = stringToInt(msgRead.data);
-            //printf("\nCLIENT: RICEVE LA SCELTA %d\n", scelta);
-
             /*
             OPTIONS:
                 1. Richiedi hash di path/to/file.
@@ -216,10 +209,6 @@ int main(int argc, char *argv[]) {
                     fgets(clientMessage, sizeof(clientMessage), stdin);
                     // Remove trailing newline if present
                     clientMessage[strcspn(clientMessage, "\n")] = 0;
-
-                    //printf("\nCLIENT: CHIEDE IL FILE %s\n", clientMessage);
-
-
                     // [04] Creo il messaggio da inviare al server
                     msgWrite.messageType = 1;
                     msgWrite.status = 0;
@@ -230,8 +219,6 @@ int main(int argc, char *argv[]) {
                     send(&msgWrite);
                     scelta = 0;
 
-                    
-                    
                     break;
                 case 2:
                     // [03] Richiedi status di fileInCalcolo

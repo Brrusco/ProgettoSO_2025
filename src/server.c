@@ -18,7 +18,7 @@
 #define LEN 256
 #define NUM_THREAD 10
 
-char uuid_str[37];
+char uuid_str[37];// variabile di appoggio per letture/scritture di uuid
 
 typedef struct clientNode{
     uuid_t clientId;
@@ -72,8 +72,15 @@ void stampaClientList(clientNode **clientHead){
     }
 }
 
+/*
+* funzione principale gestione richieste e ticket
+* se prima richiesta: assegno ticket -> creo nodo -> restituisco ticket
+* se file in coda: cerco nodo -> restituisco ticket originale
+* se file finito: cerco nodo -> restituisco ticket originale + hash
+*/
 
-int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, uuid_t clientId, char *hash) {
+
+int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, uuid_t clientId, char *hash, int *ticket) {
 
     // [0] Check memory allocation
     node *newNode = malloc(sizeof(node));
@@ -97,9 +104,11 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
             if (current->status == 2) {
                 printf("Hash per file %s è gia stato computato , lo restituisco\n", filePath);
                 strcpy(hash, current->hash);
+                *ticket = current->ticketNumber;
                 return -3; // already computed
             } else {
                 printf("Hash per file %s è in calcolamento\n", filePath);
+                *ticket = current->ticketNumber;
                 return -2; // already in queue or in progress
             }
         }
@@ -134,8 +143,9 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
         current->next = newNode;
     }
 
-    // return -1 if path is invalid, -2 if file is already in queue, ticket number otherwise
-    return *ticketCounterSystem;
+    // return -1 if path is invalid, -2 if file is already in queue, 1 otherwise
+    *ticket = (*ticketCounterSystem);
+    return 1;
 }
 
 int setFileInProgress(node *head, const int ticketNumber) {
@@ -223,7 +233,6 @@ int main(int argc, char *argv[]) {
     
     uuid_t serverId;
     uuid_t threadId;
-    char uuid_str[37];
     //uint8_t hash[32];
     char char_hash[65];
     struct Message msgRead;
@@ -306,67 +315,61 @@ int main(int argc, char *argv[]) {
         switch (msgRead.messageType) {
             //messaggi client -> server
             case 1:                                        // 1: Client filePathRequest        // assegna al server il path del file su cui calcolare SHA
-                // INIZIO LA PROCEDURA E INVIO RISPOSTA AL CLIENT
-                int ticketGiven = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId, char_hash);
-            
+                int ticketGiven;
+                int result = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId, char_hash, &ticketGiven);
                 msgWrite.messageType = 101;
                 memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
-                if (ticketGiven > 0) {
-                    // ok in coda
-                    msgWrite.status = 200;
-                    msgWrite.ticketNumber = ticketGiven;
-                    strcpy(msgWrite.data, "path ricevuta");
-                    send(&msgWrite);
-                } else if (ticketGiven == -1) {
-                    // file non esiste
-                    msgWrite.status = 404;
-                    msgWrite.ticketNumber = ticketGiven;
-                    strcpy(msgWrite.data, "file inesistente");
-                    send(&msgWrite);
-                    break;
-                } else if (ticketGiven == -2) {
-                    // file già in coda o in calcolo
-                    msgWrite.status = 405;
-                    msgWrite.ticketNumber = ticketGiven;
-                    strcpy(msgWrite.data, "path ricevuta, aggiunto a coda richieste");
-                    /*
-                    if (getTicketById(msgRead.ticketNumber, head, clonedNode) == 0) {
-                        addClient();
-                    }
-                    */
-                    send(&msgWrite);
-                    break;
-                } else if (ticketGiven == -3) {
-                    // file già calcolato -> restituisco hash gia calcolato
-                    msgWrite.status = 406;
-                    msgWrite.ticketNumber = ticketGiven;
-                    memcpy(msgWrite.data, &char_hash, sizeof(char_hash));
-                    sleep(1);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
-                    send(&msgWrite);
-                    break;
-                }
+                switch (result){
+                    case 1: // ticket aggiunto alla coda
+                        msgWrite.status = 200;
+                        msgWrite.ticketNumber = ticketGiven;
+                        strcpy(msgWrite.data, "path ricevuta");
+                        send(&msgWrite);
 
-                // MANDO MESSAGGIO AD UN THREAD CHE COMINCIA AD ELABORARE
-                msgWrite.messageType = 106;
-                msgWrite.status = 200;
-                if (threadDisponibili > 0) {
-                    msgWrite.ticketNumber = ticketGiven;
-                    memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
-                    memcpy(msgWrite.data, msgRead.data, sizeof(msgRead.data));
-                }else{
-                    // Se non ci sono thread disponibili mando in coda il primo ticket con priorità (peso maggiore)
-                    node *clonedNode = malloc(sizeof(node));
-                    msgWrite.ticketNumber = getTicketByWeight(&head, clonedNode);
-                    if (msgWrite.ticketNumber != -1) {
-                        // Se ho trovato un nodo valido, lo uso
-                        memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
-                        memcpy(msgWrite.data, clonedNode->filePath, sizeof(clonedNode->filePath));
-                    } else {
-                        errExit("Nessun nodo valido trovato E009");
-                    }
+                        // MANDO MESSAGGIO AD UN THREAD CHE COMINCIA AD ELABORARE
+                        msgWrite.messageType = 106;
+                        msgWrite.status = 200;
+                        if (threadDisponibili > 0) {
+                            msgWrite.ticketNumber = ticketGiven;
+                            memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
+                            memcpy(msgWrite.data, msgRead.data, sizeof(msgRead.data));
+                        }else{
+                            // Se non ci sono thread disponibili mando in coda il primo ticket con priorità (peso maggiore)
+                            msgWrite.ticketNumber = getTicketByWeight(&head, clonedNode);
+                            if (msgWrite.ticketNumber != -1) {
+                                // Se ho trovato un nodo valido, lo uso
+                                memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
+                                memcpy(msgWrite.data, clonedNode->filePath, sizeof(clonedNode->filePath));
+                            } else {
+                                errExit("Nessun nodo valido trovato E009");
+                            }
+                        }
+                        send(&msgWrite);
+                        break;
+                    case -1: // errore
+                        msgWrite.status = 404;
+                        msgWrite.ticketNumber = ticketGiven;
+                        strcpy(msgWrite.data, "file inesistente");
+                        send(&msgWrite);
+                        break;
+                        break;
+                    case -2: // ticket gia in coda
+                        msgWrite.status = 405;
+                        msgWrite.ticketNumber = ticketGiven;
+                        strcpy(msgWrite.data, "path ricevuta, aggiunto a coda richieste");
+                        if (getTicketById(ticketGiven, head, clonedNode) == 0) {
+                            addClient(&clonedNode->clientHead, msgRead.senderId);
+                        }
+                        send(&msgWrite);
+                        break;   
+                    case -3: // ticket gia calcolato
+                        msgWrite.status = 406;
+                        msgWrite.ticketNumber = ticketGiven;
+                        memcpy(msgWrite.data, &char_hash, sizeof(char_hash));
+                        sleep(1);      // hashing e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
+                        send(&msgWrite);
+                        break;   
                 }
-                send(&msgWrite);
-
                 break;
             case 2:                                                                 // 2: Client Ticket Status Request  // chiede lo stato o la posizione in coda
                 // Restituisco lo status del ticket
@@ -413,9 +416,6 @@ int main(int argc, char *argv[]) {
                         msgWrite.ticketNumber = clonedNode->ticketNumber;
                         memcpy(msgWrite.data, clonedNode->hash, sizeof(clonedNode->hash));
                         do{
-                            uuid_unparse(currentClient->clientId, uuid_str);
-                            printf("invio risposta a : ");
-                            printf("%s\n", uuid_str);
                             memcpy(msgWrite.destinationId, currentClient->clientId, sizeof(uuid_t));
                             send(&msgWrite);
                             currentClient = currentClient->next;
