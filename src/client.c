@@ -191,6 +191,18 @@ int main(int argc, char *argv[]) {
             printf("│ %-70s │\n", "Hash calcolato:");
             printf("│ %-70s │\n", msgRead.data);
             printf("└────────────────────────────────────────────────────────────────────────┘\n");
+            fflush(stdout);
+        }
+
+        if (msgRead.messageType == 102) {
+            printf("┌────────────────────────────────────────────────────────────────────────┐\n");
+            printf("│ %-70s │\n", "Stato ticket richiesto:");
+            char ticketInfo[80];
+            snprintf(ticketInfo, sizeof(ticketInfo), "◈ Ticket ID: %d", msgRead.ticketNumber);
+            printf("│ %-71s │\n", ticketInfo);
+            printf("│ %-70s │\n", msgRead.data);
+            printf("└────────────────────────────────────────────────────────────────────────┘\n");
+            fflush(stdout);
         }
 
         if (msgRead.messageType == 5 ) {                                // 5: Same Client to Same Client    // quando il figlio parla con il processo padre

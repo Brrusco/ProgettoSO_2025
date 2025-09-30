@@ -124,13 +124,13 @@ void receive(uuid_t idFifo, struct Message *msg){
     }
     
     // [4] Switch in base al tipo di messaggio per il client e il server
-    if(msg->messageType == 1 || (msg->status %100) != 0 || msg->messageType == 2 || msg->messageType == 102){
+    if(msg->messageType == 1 || (msg->status %100) != 0){
         printf("┌────────────────────────────────────────────────────────────────────────┐\n");
         printf("│ %-70s │\n", "Risposta Ricevuta:");
         printf("│ MESSAGE TYPE: %-56d │\n", msg->messageType);
         printf("│ STATUS: %-62d │\n", msg->status);
-        printf("│ DATA: %-64s │\n", msg->data);
         (msg->ticketNumber > 0) ? printf("│ TICKET: %-62d │\n", msg->ticketNumber) : (void)0; // se ticket number > 0 lo stampa
+        printf("│ DATA: %-64s │\n", msg->data);
         printf("└────────────────────────────────────────────────────────────────────────┘\n");
     }
    
