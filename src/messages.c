@@ -52,7 +52,7 @@ void send(struct Message *message){
             //printf("[MSG DEBUG] Invio richiesta filePath a %s\n", fifoPath);
             break;
         case 2:
-            printf("[MSG DEBUG] Invio richiesta stato ticket a %s\n", fifoPath);
+            //printf("[MSG DEBUG] Invio richiesta stato ticket a %s\n", fifoPath);
             break;
         case 3:
             printf("[MSG DEBUG] Invio richiesta di chiusura connessione a %s\n", fifoPath);
@@ -62,6 +62,9 @@ void send(struct Message *message){
             break;
         case 101:
             //printf("[MSG DEBUG] Invio risposta dal server in merito alla richiesta del file\n" );
+            break;
+        case 102:
+            //printf("[MSG DEBUG] Invio risposta dal server in merito al ticket status\n" );
             break;
         case 103:
             //printf("[MSG DEBUG] Invio risposta dal server con hash del file\n");
@@ -121,7 +124,7 @@ void receive(uuid_t idFifo, struct Message *msg){
     }
     
     // [4] Switch in base al tipo di messaggio per il client e il server
-    if(msg->messageType == 1 || (msg->status %100) != 0){
+    if(msg->messageType == 1 || (msg->status %100) != 0 || msg->messageType == 2 || msg->messageType == 102){
         printf("┌────────────────────────────────────────────────────────────────────────┐\n");
         printf("│ %-70s │\n", "Risposta Ricevuta:");
         printf("│ MESSAGE TYPE: %-56d │\n", msg->messageType);
@@ -136,7 +139,7 @@ void receive(uuid_t idFifo, struct Message *msg){
             //printf("[MSG DEBUG] Ricevuto richiesta filePath a %s\n", fifoPath);
             break;
         case 2:
-            printf("[MSG DEBUG] Ricevuto richiesta stato ticket a %s\n", fifoPath);
+            //printf("[MSG DEBUG] Ricevuto richiesta stato ticket a %s\n", fifoPath);
             break;
         case 3:
             printf("[MSG DEBUG] Ricevuto richiesta di chiusura connessione a %s\n", fifoPath);
@@ -146,6 +149,9 @@ void receive(uuid_t idFifo, struct Message *msg){
             break;
         case 101:
             //printf("[MSG DEBUG] Ricevuto risposta dal server in merito alla richiesta del file\n" );
+            break;
+        case 102:
+            //printf("[MSG DEBUG] Ricevuto risposta dal server in merito al ticket status\n" );
             break;
         case 103:
             //printf("[MSG DEBUG] Ricevuto hash del file\n");

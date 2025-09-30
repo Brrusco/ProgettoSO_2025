@@ -112,6 +112,7 @@ int main(int argc, char *argv[]) {
     int scelta;
     int exitCode;
     int cont=0;
+    int ticket = 0 ;
 
     msgWrite.ticketNumber = 0;
 
@@ -223,14 +224,15 @@ int main(int argc, char *argv[]) {
                 case 2:
                     // [03] Richiedi status di fileInCalcolo
                     printf("<Client> Inserisci il ticket: \n");
-                    scanf(" %s", clientMessage);
+                    scanf(" %d", &ticket);
 
                     // [04] Creo il messaggio da inviare al server
                     msgWrite.messageType = 2;
                     msgWrite.status = 0;
+                    msgWrite.ticketNumber = ticket;
                     memcpy(msgWrite.senderId, clientId, sizeof(uuid_t));
                     memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
-                    snprintf(msgWrite.data, sizeof(msgWrite.data), "%s", clientMessage);
+                    memcpy(msgWrite.data, "ticket status", strlen("ticket status") + 1);
 
                     send(&msgWrite);
                     scelta = 0;

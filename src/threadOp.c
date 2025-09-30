@@ -75,7 +75,7 @@ void *threadOp(void *arg){
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.data, char_hash, sizeof(char_hash));
-                sleep(1);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
+                sleep(10);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
                 printf("<Thread> file : %s  - DONE - Hash : %s\n",msgRead.data,char_hash);
                 send(&msgWrite);
               

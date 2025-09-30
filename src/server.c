@@ -335,7 +335,7 @@ int main(int argc, char *argv[]) {
                             memcpy(msgWrite.data, msgRead.data, sizeof(msgRead.data));
                         }else{
                             // Se non ci sono thread disponibili mando in coda il primo ticket con priorità (peso maggiore)
-                            msgWrite.ticketNumber = getTicketByWeight(&head, clonedNode);
+                            msgWrite.ticketNumber = getTicketByWeight(head, clonedNode);
                             if (msgWrite.ticketNumber != -1) {
                                 // Se ho trovato un nodo valido, lo uso
                                 memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
@@ -375,6 +375,7 @@ int main(int argc, char *argv[]) {
                 // Restituisco lo status del ticket
                 memcpy(msgWrite.senderId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
+                msgWrite.messageType = 102;
 
                 for (node *curr = head; curr != NULL; curr = curr->next) {
                     if (curr->ticketNumber == msgRead.ticketNumber) {
