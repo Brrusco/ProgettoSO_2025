@@ -66,7 +66,7 @@ void addClient(clientNode **clientHead, uuid_t clientId){
 void stampaClientList(clientNode **clientHead){
     clientNode *current = *clientHead;
     char uuid_str[37];
-    printf("<Server> stampando Client\n");
+    printf("<Server> stampando lista Client\n");
     fflush(stdout);
     while (current) {
         uuid_unparse(current->clientId, uuid_str);
@@ -74,6 +74,14 @@ void stampaClientList(clientNode **clientHead){
         fflush(stdout);
         current = current->next;
     }
+}
+
+void printNode(node *node){
+    printf("┌────────────────────────────────────────────────────────────────────────┐\n");
+    printf("Printing Node: \nTicket Number : %d\nStatus : %d\n", node->ticketNumber, node->status);
+    stampaClientList(&node->clientHead);
+    printf("File Path : %s\nHash : %s\nWeight : %ld\n", node->filePath, node->hash, node->weight);
+     printf("└────────────────────────────────────────────────────────────────────────┘\n");
 }
 
 /*
@@ -110,10 +118,13 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
                 strcpy(hash, current->hash);
                 *ticket = current->ticketNumber;
                 return -3; // already computed
-            } else {
+            } else if(current->status == 1) {
                 printf("<Server> Hash per file %s è in calcolamento\n", filePath);
                 *ticket = current->ticketNumber;
                 return -2; // already in queue or in progress
+            } else {
+                printf("<Server> errore nella gestione dello status\n");
+                return -1;
             }
         }
         current = current->next;
@@ -148,7 +159,7 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
     }
 
     // return -1 if path is invalid, -2 if file is already in queue, 1 otherwise
-    *ticket = (*ticketCounterSystem);
+    *ticket = *ticketCounterSystem;
     return 1;
 }
 
@@ -367,7 +378,7 @@ int main(int argc, char *argv[]) {
                     case -1: // errore
                         msgWrite.status = 404;
                         msgWrite.ticketNumber = ticketGiven;
-                        strcpy(msgWrite.data, "file inesistente");
+                        strcpy(msgWrite.data, "errore in ricerca del file");
                         send(&msgWrite);
                         break;
                         break;
@@ -384,7 +395,6 @@ int main(int argc, char *argv[]) {
                         msgWrite.status = 406;
                         msgWrite.ticketNumber = ticketGiven;
                         memcpy(msgWrite.data, &char_hash, sizeof(char_hash));
-                        sleep(1);      // hashing e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
                         send(&msgWrite);
                         break;   
                 }
@@ -440,7 +450,6 @@ int main(int argc, char *argv[]) {
                             currentClient = currentClient->next;
                         }while(currentClient != NULL);
                     }
-                    free(clonedNode);
                 }
                 threadDisponibili++;
             break;
@@ -448,8 +457,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    free(clonedNode);
     cleanup();
-
     exit(0);
 }
 

@@ -108,7 +108,7 @@ void printHash(char *hash){
 void cleanup(){
     printf("<Client> removing FIFO...\n");
     if (unlink(path2ClientFIFO) != 0){
-        errExit("unlink serverFIFO failed");
+        errExit("unlink clientFIFO failed");
     }
 }
 
@@ -218,8 +218,8 @@ int main(int argc, char *argv[]) {
             printf("┌────────────────────────────────────────────────────────────────────────┐\n");
             printf("│ %-70s │\n", "Stato ticket richiesto:");
             char ticketInfo[80];
-            snprintf(ticketInfo, sizeof(ticketInfo), "◈ Ticket ID: %d", msgRead.ticketNumber);
-            printf("│ %-71s │\n", ticketInfo);
+            snprintf(ticketInfo, sizeof(ticketInfo), "◈ Ticket ID : %d", msgRead.ticketNumber);
+            printf("│ %-72s │\n", ticketInfo);
             printf("│ %-70s │\n", msgRead.data);
             printf("└────────────────────────────────────────────────────────────────────────┘\n");
             fflush(stdout);

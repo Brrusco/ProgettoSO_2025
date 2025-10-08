@@ -112,7 +112,7 @@ void receive(uuid_t idFifo, struct Message *msg){
         errExit("[MSG ERROR] Receive : open fifo failed");
     }   
     
-    sleep(1);   //IMPORTANTE ogni tanto la open della fifo in read (async) ci mette troppo tempo e quindi poi fa la read su una fifo ancora non aperta, è brutto ma cosi siamo sicuri che la fifo sia aperta
+    usleep(100);   //IMPORTANTE ogni tanto la open della fifo in read (async) ci mette troppo tempo e quindi poi fa la read su una fifo ancora non aperta, è brutto ma cosi siamo sicuri che la fifo sia aperta
      
     // [3] Legge la fifo e attende i messaggi
     if(read(fifoPointer, msg, sizeof(struct Message)) != sizeof(struct Message)){
