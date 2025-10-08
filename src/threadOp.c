@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 199309L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,6 +11,7 @@
 #include <sys/stat.h>
 #include <uuid/uuid.h>
 #include <sys/ipc.h>
+#include <time.h>
 
 #include "errExit.h"
 #include "SHA_256.h"
@@ -23,6 +26,9 @@ struct ThreadData {
 void *threadOp(void *arg){
     struct Message msgRead;
     struct Message msgWrite;
+
+    struct timespec start, end;
+    double elapsed;
 
     uint8_t hash[32];
     char char_hash[65];
@@ -48,12 +54,13 @@ void *threadOp(void *arg){
     }
     
     do{
-        wait(semaforoId);
+        waitSem(semaforoId);
         receive(threadData->threadId, &msgRead);
-        signal(semaforoId);
+        signalSem(semaforoId);
         switch (msgRead.messageType) {
             case 106:                   // 106: Server assegna ad un thread un filepath per calcolo SHA
                 printf("<Thread> file ricevuto : %s\n",msgRead.data);
+                clock_gettime(CLOCK_MONOTONIC, &start);
 
                 // Comunico al server ch inizio a lavorare
                 msgWrite.messageType = 202;
@@ -75,8 +82,12 @@ void *threadOp(void *arg){
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.data, char_hash, sizeof(char_hash));
-                sleep(10);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
-                printf("<Thread> file : %s  - DONE - Hash : %s\n",msgRead.data,char_hash);
+
+                //sleep(10);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
+                clock_gettime(CLOCK_MONOTONIC, &end);
+                elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+                printf("<Thread> file : %s  - DONE - Hash : %s | Tempo di elaborazione: %.3f secondi\n",msgRead.data,char_hash, elapsed);
                 send(&msgWrite);
               
             break;

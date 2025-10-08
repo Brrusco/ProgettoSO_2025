@@ -11,13 +11,14 @@
 #include <sys/ipc.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
-
+#include <signal.h>
 
 #include "errExit.h"
 #include "msg.h"
 
 
 #define LEN 256
+char path2ClientFIFO [LEN];
 
 typedef struct node {
     int value;
@@ -96,9 +97,29 @@ void printMenu() {
     printf("Seleziona un'opzione: \n");
 }
 
+void printHash(char *hash){
+    printf("┌────────────────────────────────────────────────────────────────────────┐\n");
+    printf("│ %-70s │\n", "Hash calcolato:");
+    printf("│ %-70s │\n", hash);
+    printf("└────────────────────────────────────────────────────────────────────────┘\n");
+    fflush(stdout);
+}
+
+void cleanup(){
+    printf("<Client> removing FIFO...\n");
+    if (unlink(path2ClientFIFO) != 0){
+        errExit("unlink serverFIFO failed");
+    }
+}
+
+void handle_sigint(int sig) {
+    printf("\n[signal] Ricevuto SIGINT (Ctrl+C)\n");
+    cleanup();
+    exit(0);
+}
 
 int main(int argc, char *argv[]) {
-
+    signal(SIGINT, handle_sigint);
     printf("╔═══════════════════════════════════════╗\n");
     printf("║          Benvenuto nel Client         ║\n");
     printf("╚═══════════════════════════════════════╝\n");
@@ -126,7 +147,6 @@ int main(int argc, char *argv[]) {
     uuid_unparse(serverId, uuid_str);
     snprintf(path2ServerFIFO, sizeof(path2ServerFIFO), "%s%s", baseFIFOpath, uuid_str);
 
-    char path2ClientFIFO [LEN];
     uuid_unparse(clientId, uuid_str);
     snprintf(path2ClientFIFO, sizeof(path2ClientFIFO), "%s%s", baseFIFOpath, uuid_str);
 
@@ -138,7 +158,7 @@ int main(int argc, char *argv[]) {
             printf("<Client> FIFO %s already exists, using it.\n", path2ClientFIFO);
     }
     else
-        printf("<Client> FIFO %s creata!\n", path2ClientFIFO);
+        printf("<Client> FIFO client : %s creata!\n", path2ClientFIFO);
 
     printf("%-40s", "────────────────────────────────────────");
     printf("< Ciclo numero: %d >", cont);
@@ -185,13 +205,13 @@ int main(int argc, char *argv[]) {
             addIntToList(&linkedTickets, msgRead.ticketNumber);
         }
         
+        if (msgRead.messageType == 101 && msgRead.status == 406) {      // type 101 -> status 406 = path gia calcolato in precedenza , il server restituisce direttamente l'hash
+            printHash(msgRead.data);
+        }
+
         if (msgRead.messageType == 103  || msgRead.messageType == 105) {                              // 3: Client FINACK                 // chiude la connessione tranquillamente
             removeIntFromList(&linkedTickets, msgRead.ticketNumber);
-            printf("┌────────────────────────────────────────────────────────────────────────┐\n");
-            printf("│ %-70s │\n", "Hash calcolato:");
-            printf("│ %-70s │\n", msgRead.data);
-            printf("└────────────────────────────────────────────────────────────────────────┘\n");
-            fflush(stdout);
+            printHash(msgRead.data);
         }
 
         if (msgRead.messageType == 102) {

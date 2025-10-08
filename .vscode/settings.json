@@ -6,6 +6,7 @@
         "stdio.h": "c",
         "errno.h": "c",
         "msg.h": "c",
-        "fcntl.h": "c"
+        "fcntl.h": "c",
+        "time.h": "c"
     }
 }

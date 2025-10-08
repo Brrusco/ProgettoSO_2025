@@ -11,7 +11,7 @@
 /*
 * @semid id del semaforo su cui fare l'operazione
 */
-int wait(int semid) {
+int waitSem(int semid) {
     struct sembuf operation;
     
     operation.sem_num = 0;    // Numero del semaforo nel set
@@ -28,7 +28,7 @@ int wait(int semid) {
 /*
 * @semid id del semaforo su cui fare l'operazione
 */
-int signal(int semid) {
+int signalSem(int semid) {
     struct sembuf operation;
     
     operation.sem_num = 0;    // Numero del semaforo nel set

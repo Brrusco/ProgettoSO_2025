@@ -110,21 +110,23 @@ void receive(uuid_t idFifo, struct Message *msg){
     if (fifoPointer == -1) {
         printf("[MSG ERROR] fifo : %s", fifoPath);
         errExit("[MSG ERROR] Receive : open fifo failed");
-    }       
+    }   
+    
+    sleep(1);   //IMPORTANTE ogni tanto la open della fifo in read (async) ci mette troppo tempo e quindi poi fa la read su una fifo ancora non aperta, è brutto ma cosi siamo sicuri che la fifo sia aperta
      
     // [3] Legge la fifo e attende i messaggi
     if(read(fifoPointer, msg, sizeof(struct Message)) != sizeof(struct Message)){
         if (errno == ENOENT) {
-            printf("[MSG ERROR] fifo : %s", fifoPath);
+            printf("[MSG ERROR] fifo : %s\n", fifoPath);
             errExit("[MSG ERROR] Receive : FIFO non esiste, assicurati che il client sia in esecuzione.\n");
         } else {
-            printf("fifo : %s", fifoPath);
+            printf("[MSG ERROR] fifo : %s\n", fifoPath);
             errExit("[MSG ERROR] Receive : read on fifo failed");
         }
     }
     
     // [4] Switch in base al tipo di messaggio per il client e il server
-    if(msg->messageType == 1 || (msg->status %100) != 0){
+    if(msg->status == 404){
         printf("┌────────────────────────────────────────────────────────────────────────┐\n");
         printf("│ %-70s │\n", "Risposta Ricevuta:");
         printf("│ MESSAGE TYPE: %-56d │\n", msg->messageType);

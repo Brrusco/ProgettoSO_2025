@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <uuid/uuid.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "errExit.h"
 #include "SHA_256.h"
@@ -18,7 +19,10 @@
 #define LEN 256
 #define NUM_THREAD 10
 
+
 char uuid_str[37];// variabile di appoggio per letture/scritture di uuid
+char path2ServerFIFO [LEN];
+char path2ThreadFIFO [LEN]; 
 
 typedef struct clientNode{
     uuid_t clientId;
@@ -62,7 +66,7 @@ void addClient(clientNode **clientHead, uuid_t clientId){
 void stampaClientList(clientNode **clientHead){
     clientNode *current = *clientHead;
     char uuid_str[37];
-    printf("stampando Client\n");
+    printf("<Server> stampando Client\n");
     fflush(stdout);
     while (current) {
         uuid_unparse(current->clientId, uuid_str);
@@ -91,7 +95,7 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
 
     // [1] Check filepath validity
     if (access(filePath, F_OK) != 0) {
-        fprintf(stderr, "File %s does not exist\n", filePath);
+        fprintf(stderr, "<Server> Il file selezionato : %s non esiste\n", filePath);
         free(newNode);
         return -1;
     }
@@ -102,12 +106,12 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
         if (strcmp(current->filePath, filePath) == 0) {
             free(newNode);
             if (current->status == 2) {
-                printf("Hash per file %s è gia stato computato , lo restituisco\n", filePath);
+                printf("<Server> Hash per file %s è gia stato computato , lo restituisco\n", filePath);
                 strcpy(hash, current->hash);
                 *ticket = current->ticketNumber;
                 return -3; // already computed
             } else {
-                printf("Hash per file %s è in calcolamento\n", filePath);
+                printf("<Server> Hash per file %s è in calcolamento\n", filePath);
                 *ticket = current->ticketNumber;
                 return -2; // already in queue or in progress
             }
@@ -226,7 +230,25 @@ void printStatus(node *linkedTicketList) {
     }
 }
 
+void cleanup(){
+    printf("<Server> removing FIFO...\n");
+    if (unlink(path2ServerFIFO) != 0){
+        errExit("unlink serverFIFO failed");
+    }
+    if (unlink(path2ThreadFIFO) != 0){
+        errExit("unlink threadFIFO failed");
+    }
+}
+
+void handle_sigint(int sig) {
+    printf("\n[signal] Ricevuto SIGINT (Ctrl+C)\n");
+    cleanup();
+    exit(0);
+}
+
+
 int main(int argc, char *argv[]) {
+    signal(SIGINT, handle_sigint);
     printf("╔═══════════════════════════════════════╗\n");
     printf("║          Benvenuto nel Server         ║\n");
     printf("╚═══════════════════════════════════════╝\n");
@@ -237,8 +259,6 @@ int main(int argc, char *argv[]) {
     char char_hash[65];
     struct Message msgRead;
     struct Message msgWrite;
-    char path2ServerFIFO [LEN];
-    char path2ThreadFIFO [LEN]; 
     
     node *head = NULL;
 
@@ -271,7 +291,7 @@ int main(int argc, char *argv[]) {
             printf("<Server> FIFO %s already exists, using it.\n", path2ServerFIFO);
         }
     } else {
-        printf("<Server> FIFO %s creata!\n", path2ServerFIFO);
+        printf("<Server> FIFO server : %s creata!\n", path2ServerFIFO);
     }
     
 
@@ -288,13 +308,12 @@ int main(int argc, char *argv[]) {
             printf("<Server> FIFO %s already exists, using it.\n", path2ThreadFIFO);
         }
     } else {
-        printf("<Server> FIFO %s creata!\n", path2ThreadFIFO);
+        printf("<Server> FIFO threads : %s creata!\n", path2ThreadFIFO);
     }
 
     
     memcpy(threadData.threadId, threadId, sizeof(uuid_t));
     for (int i = 0; i < NUM_THREAD; i++) {
-        //printf("thread #%d",i+1);
         // Create the thread and execute the calculateSum function
         if (pthread_create(&threads[i], NULL, threadOp, (void *)&threadData) != 0) {
             errExit("Error creating thread");
@@ -302,7 +321,6 @@ int main(int argc, char *argv[]) {
         receive(serverId,&msgRead);
         if(msgRead.messageType == 201 && msgRead.status == 200){
             threadDisponibili++;
-            //printf("\tok\n");
             fflush(stdout);
         }else{
             errExit("Errore nella ricezione messaggio dal thread");
@@ -430,27 +448,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    
-    
-    /*
-    // [04] Eseguo SHA256 sul file ricevuto e converte in stringa
-    digest_file(clientMessage, hash);
-    for(int i = 0; i < 32; i++) {
-        sprintf(char_hash + (i * 2), "%02x", hash[i]);
-    }
-    printf("<Server> SHA256: %s\n", char_hash);
-    */
-    
-
-    // [05] Open the FIFO created by Client in write-only mode
-
-
-    // [c1] Rimozione della FIFO propria
-    printf("<Server> removing FIFO...\n");
-    if (unlink(path2ServerFIFO) != 0)
-        errExit("unlink serverFIFO failed");
-    if (unlink(path2ThreadFIFO) != 0)
-        errExit("unlink threadFIFO failed");
+    cleanup();
 
     exit(0);
 }

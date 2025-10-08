@@ -4,8 +4,8 @@
 #include <sys/types.h>
 #include <sys/sem.h>
 
-int wait(int semid);
-int signal(int semid);
+int waitSem(int semid);
+int signalSem(int semid);
 int sem_init(key_t key, int nsems);
 
 #endif
