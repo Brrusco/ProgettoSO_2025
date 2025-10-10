@@ -62,12 +62,12 @@ void *threadOp(void *arg){
                 printf("<Thread> file ricevuto : %s\n",msgRead.data);
                 clock_gettime(CLOCK_MONOTONIC, &start);
 
-                // Comunico al server ch inizio a lavorare
+                // Comunico al server che inizio a lavorare
                 msgWrite.messageType = 202;
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.data, "thread ticket assign", strlen("thread ticket assign") + 1);
                 msgWrite.status = 200;
-                send(&msgWrite);
+                send(&msgWrite);                    // conferma presa in carico del ticket
             
                 memset(hash, 0, sizeof(hash));
                 memset(char_hash, 0, sizeof(char_hash));
@@ -82,7 +82,7 @@ void *threadOp(void *arg){
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.data, char_hash, sizeof(char_hash));
-                sleep(1);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
+                sleep(10);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
                 clock_gettime(CLOCK_MONOTONIC, &end);
                 elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000000000.0;
 

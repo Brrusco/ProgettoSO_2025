@@ -17,7 +17,7 @@
 #include "threadOp.h"
 
 #define LEN 256
-#define NUM_THREAD 4
+#define NUM_THREAD 1
 
 
 char uuid_str[37];// variabile di appoggio per letture/scritture di uuid
@@ -243,6 +243,27 @@ int getTicketByWeight(node *head, node *toClone) {
     return maxWeight == -1 ? -1 : 0;
 }
 
+int getPendingTicket(node *head,int *ticketNumber, char *filePath){
+    node *current = head;
+    long minWeight;
+    int found = 0;
+    while (current) {
+        if (current->status == 0) {
+            if(!found){
+                minWeight = current->weight;
+                found = 1;
+            }
+            if(current->weight <= minWeight){ // ("<=") è importante per ripetere meno codice
+                minWeight = current->weight;
+                *ticketNumber = current->ticketNumber;
+                strcpy(filePath, current->filePath);
+            }
+        }
+        current = current->next;
+    }
+    return found; // returno minweight cosi se fallisce mi da il numero negativo
+}
+
 
 void printStatus(node *linkedTicketList) {
     printf("┌────────┬──────────────────────────────┐\n");
@@ -303,6 +324,8 @@ int main(int argc, char *argv[]) {
     pthread_t threads[NUM_THREAD];
     struct ThreadData threadData;
     int threadDisponibili = 0;
+    int filesPending = 0;
+    char filePath[LEN];
 
     int ticketCounterSystem;
     ticketCounterSystem = 0;
@@ -377,27 +400,20 @@ int main(int argc, char *argv[]) {
                         msgWrite.status = 200;
                         msgWrite.ticketNumber = ticketGiven;
                         strcpy(msgWrite.data, "path ricevuta");
-                        send(&msgWrite);
+                        send(&msgWrite);        // server manda ack al client
 
                         // MANDO MESSAGGIO AD UN THREAD CHE COMINCIA AD ELABORARE
-                        msgWrite.messageType = 106;
-                        msgWrite.status = 200;
                         if (threadDisponibili > 0) {
+                            msgWrite.messageType = 106;
+                            msgWrite.status = 200;
                             msgWrite.ticketNumber = ticketGiven;
                             memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
                             memcpy(msgWrite.data, msgRead.data, sizeof(msgRead.data));
+                            send(&msgWrite);
                         }else{
-                            // Se non ci sono thread disponibili mando in coda il primo ticket con priorità (peso maggiore)
-                            msgWrite.ticketNumber = getTicketByWeight(head, clonedNode);
-                            if (msgWrite.ticketNumber != -1) {
-                                // Se ho trovato un nodo valido, lo uso
-                                memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
-                                memcpy(msgWrite.data, clonedNode->filePath, sizeof(clonedNode->filePath));
-                            } else {
-                                errExit("Nessun nodo valido trovato E009");
-                            }
+                            filesPending++;
+                            printf("<Server> aggiunta del file %s in coda\n", msgRead.data);
                         }
-                        send(&msgWrite);
                         break;
                     case -1: // errore
                         msgWrite.status = 404;
@@ -451,7 +467,6 @@ int main(int argc, char *argv[]) {
                     strcpy(msgWrite.data, "Ticket non trovato");
                 }
 
-                //printTicketList(head);
                 send(&msgWrite);
 
                 break;
@@ -473,12 +488,25 @@ int main(int argc, char *argv[]) {
                         memcpy(msgWrite.data, clonedNode->hash, sizeof(clonedNode->hash));
                         do{
                             memcpy(msgWrite.destinationId, currentClient->clientId, sizeof(uuid_t));
-                            send(&msgWrite);
+                            send(&msgWrite);                                                 // risponde a tutti i client interessati al risultato
                             currentClient = currentClient->next;
                         }while(currentClient != NULL);
                     }
                 }
                 threadDisponibili++;
+                if(filesPending>0){ // se rimane qualche file in coda che aspetta di essere eseguito faccio il fetch del file meno pesante e lo mando direttamente al threadù
+                    if(getPendingTicket(head,&ticketGiven,filePath)){
+                        msgWrite.messageType = 106;
+                        msgWrite.status = 200;
+                        msgWrite.ticketNumber = ticketGiven;
+                        memcpy(msgWrite.destinationId, threadId, sizeof(uuid_t));
+                        memcpy(msgWrite.data, filePath, sizeof(filePath));
+                        send(&msgWrite);
+                        filesPending--;
+                    }else{
+                        errExit("Errore in ricerca file a peso minimo");
+                    }
+                }
             break;
 
         }
