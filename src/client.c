@@ -239,7 +239,7 @@ int main(int argc, char *argv[]) {
                     // [03] Chiedo all'utente la path del file
 
                     printf("<Client> Dammi la Path del File su cui eseguire SHA256: \n");
-                    fgets(clientMessage, sizeof(clientMessage), stdin);
+                    scanf(" %s", clientMessage);
                     // Remove trailing newline if present
                     clientMessage[strcspn(clientMessage, "\n")] = 0;
                     // [04] Creo il messaggio da inviare al server

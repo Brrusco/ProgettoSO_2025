@@ -451,7 +451,7 @@ int main(int argc, char *argv[]) {
                     strcpy(msgWrite.data, "Ticket non trovato");
                 }
 
-                printTicketList(head);
+                //printTicketList(head);
                 send(&msgWrite);
 
                 break;
