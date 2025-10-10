@@ -44,9 +44,14 @@ typedef struct node {
 
 
 void addClient(clientNode **clientHead, uuid_t clientId){
+    if (*clientHead != NULL && uuid_compare((*clientHead)->clientId, clientId) == 0) { // previene l'aggiunta dello stesso client id piu volte nella lista
+        fflush(stdout);
+        return;
+    }
     clientNode *newNode = malloc(sizeof(clientNode));
     if (!newNode) {
         perror("Errore : fallita allocazione memoria per clientNode");
+        return;
     }
     uuid_copy(newNode->clientId, clientId);
     newNode->next = NULL;
@@ -55,10 +60,18 @@ void addClient(clientNode **clientHead, uuid_t clientId){
         *clientHead = newNode;
     } else {
         clientNode *current = *clientHead;
-        while (current->next) {
+        while (current) {
+            if(uuid_compare(current->clientId, clientId) == 0){ // previene l'aggiunta dello stesso client id piu volte nella lista
+                fflush(stdout);
+                free(newNode);
+                return;
+            }
+            if (current->next == NULL) {
+                current->next = newNode;
+                return;
+            }
             current = current->next;
         }
-        current->next = newNode;
     }
 
 }
@@ -70,7 +83,7 @@ void stampaClientList(clientNode **clientHead){
     fflush(stdout);
     while (current) {
         uuid_unparse(current->clientId, uuid_str);
-        printf("Client: %s\n", uuid_str);
+        printf(" - Client: %s\n", uuid_str);
         fflush(stdout);
         current = current->next;
     }
@@ -110,8 +123,10 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
 
     // [2] Check if file is already in queue | TODO function searchByPath ?
     node *current = *head;
+
     while (current) {
         if (strcmp(current->filePath, filePath) == 0) {
+            printNode(current);
             free(newNode);
             if (current->status == 2) {
                 printf("<Server> Hash per file %s è gia stato computato , lo restituisco\n", filePath);

@@ -134,7 +134,10 @@ void receive(uuid_t idFifo, struct Message *msg){
         (msg->ticketNumber > 0) ? printf("│ TICKET: %-62d │\n", msg->ticketNumber) : (void)0; // se ticket number > 0 lo stampa
         printf("│ DATA: %-64s │\n", msg->data);
         printf("└────────────────────────────────────────────────────────────────────────┘\n");
+    }else{
+        printf(">MSG %d\n", msg->messageType);
     }
+    fflush(stdout);
    
     switch (msg->messageType) {
         case 1:
