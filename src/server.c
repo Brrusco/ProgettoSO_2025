@@ -17,7 +17,7 @@
 #include "threadOp.h"
 
 #define LEN 256
-#define NUM_THREAD 10
+#define NUM_THREAD 4
 
 
 char uuid_str[37];// variabile di appoggio per letture/scritture di uuid
@@ -79,7 +79,7 @@ void addClient(clientNode **clientHead, uuid_t clientId){
 void stampaClientList(clientNode **clientHead){
     clientNode *current = *clientHead;
     char uuid_str[37];
-    printf("<Server> stampando lista Client\n");
+    printf("<Server> stampando lista Client : \n");
     fflush(stdout);
     while (current) {
         uuid_unparse(current->clientId, uuid_str);
@@ -94,7 +94,16 @@ void printNode(node *node){
     printf("Printing Node: \nTicket Number : %d\nStatus : %d\n", node->ticketNumber, node->status);
     stampaClientList(&node->clientHead);
     printf("File Path : %s\nHash : %s\nWeight : %ld\n", node->filePath, node->hash, node->weight);
-     printf("└────────────────────────────────────────────────────────────────────────┘\n");
+    printf("└────────────────────────────────────────────────────────────────────────┘\n");
+}
+
+void printTicketList(node *head){
+    node *current = head;
+    printf("<Server> stampando lista Ticket : \n");
+    while (current) {
+        printNode(current);
+        current = current->next;
+    }
 }
 
 /*
@@ -126,7 +135,7 @@ int addFileInQueue(node **head, int *ticketCounterSystem, const char *filePath, 
 
     while (current) {
         if (strcmp(current->filePath, filePath) == 0) {
-            printNode(current);
+            //printNode(current);
             free(newNode);
             if (current->status == 2) {
                 printf("<Server> Hash per file %s è gia stato computato , lo restituisco\n", filePath);
@@ -419,6 +428,8 @@ int main(int argc, char *argv[]) {
                 memcpy(msgWrite.senderId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.destinationId, msgRead.senderId, sizeof(uuid_t));
                 msgWrite.messageType = 102;
+                msgWrite.ticketNumber = msgRead.ticketNumber;
+                msgWrite.status = 404; // di default lo status è 404 , se il ticket viene trovato viene sovrascritto, se non viene trovato il ticket rimane 404 e da errore "Ticket non trovato"
 
                 for (node *curr = head; curr != NULL; curr = curr->next) {
                     if (curr->ticketNumber == msgRead.ticketNumber) {
@@ -440,6 +451,7 @@ int main(int argc, char *argv[]) {
                     strcpy(msgWrite.data, "Ticket non trovato");
                 }
 
+                printTicketList(head);
                 send(&msgWrite);
 
                 break;
