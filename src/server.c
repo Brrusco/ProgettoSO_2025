@@ -399,7 +399,7 @@ int main(int argc, char *argv[]) {
                     case 1: // ticket aggiunto alla coda
                         msgWrite.status = 200;
                         msgWrite.ticketNumber = ticketGiven;
-                        strcpy(msgWrite.data, "path ricevuta");
+                        strcpy(msgWrite.data, msgRead.data);
                         send(&msgWrite);        // server manda ack al client
 
                         // MANDO MESSAGGIO AD UN THREAD CHE COMINCIA AD ELABORARE

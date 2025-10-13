@@ -19,20 +19,23 @@
 
 #define LEN 256
 char path2ClientFIFO [LEN];
+char ticketInfo[LEN];
 
 typedef struct node {
     int value;
+    char path[LEN];
     struct node *next;
 } node;
 
 // Aggiunge un intero alla coda della lista
-void addIntToList(node **head, int value) {
+void addIntToList(node **head, int value, char *path) {
     node *newNode = malloc(sizeof(node));
     if (!newNode) {
         perror("malloc failed");
         exit(EXIT_FAILURE);
     }
     newNode->value = value;
+    strcpy(newNode->path, path);
     newNode->next = NULL;
 
     if (*head == NULL) {
@@ -79,7 +82,7 @@ void printStatus(node *linkedTicketList) {
     printf("┌───────────────────────────────────────┐\n");
     printf("│ File in elaborazione:                 │\n");
     for(node *curr = linkedTicketList; curr != NULL; curr = curr->next) {
-        printf("│ ◈ Ticket ID: %d\t\t\t│\n", curr->value);
+        printf("│ ◈ Ticket ID: %d - %s\t\t│\n", curr->value, curr->path);
     }
     if (linkedTicketList == NULL) {
         printf("│ ◈ Nessun file in elaborazione\t\t│\n");
@@ -97,9 +100,10 @@ void printMenu() {
     printf("Seleziona un'opzione: \n");
 }
 
-void printHash(char *hash){
+void printHash(char *hash, int ticketNumber){
     printf("┌────────────────────────────────────────────────────────────────────────┐\n");
-    printf("│ %-70s │\n", "Hash calcolato:");
+    snprintf(ticketInfo, sizeof(ticketInfo), "Hash calcolato per Ticket %d :", ticketNumber);
+    printf("│ %-70s │\n", ticketInfo);
     printf("│ %-70s │\n", hash);
     printf("└────────────────────────────────────────────────────────────────────────┘\n");
     fflush(stdout);
@@ -202,22 +206,21 @@ int main(int argc, char *argv[]) {
 
         // Controllo il tipo di messaggio ricevuto
         if (msgRead.messageType == 101 && msgRead.status == 200) {      // 101: Server filePath confirm     // ACK dice ok ho ricevuto il path adesso (non?) calcolo lo SHA (non e ancora finito) e restituisce il ticket del processo SHA
-            addIntToList(&linkedTickets, msgRead.ticketNumber);
+            addIntToList(&linkedTickets, msgRead.ticketNumber, msgRead.data);
         }
         
         if (msgRead.messageType == 101 && msgRead.status == 406) {      // type 101 -> status 406 = path gia calcolato in precedenza , il server restituisce direttamente l'hash
-            printHash(msgRead.data);
+            printHash(msgRead.data, msgRead.ticketNumber);
         }
 
         if (msgRead.messageType == 103  || msgRead.messageType == 105) {                              // 3: Client FINACK                 // chiude la connessione tranquillamente
             removeIntFromList(&linkedTickets, msgRead.ticketNumber);
-            printHash(msgRead.data);
+            printHash(msgRead.data, msgRead.ticketNumber);
         }
 
         if (msgRead.messageType == 102) {
             printf("┌────────────────────────────────────────────────────────────────────────┐\n");
             printf("│ %-70s │\n", "Stato ticket richiesto:");
-            char ticketInfo[80];
             snprintf(ticketInfo, sizeof(ticketInfo), "◈ Ticket ID : %d", msgRead.ticketNumber);
             printf("│ %-72s │\n", ticketInfo);
             printf("│ %-70s │\n", msgRead.data);
