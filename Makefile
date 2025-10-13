@@ -33,3 +33,16 @@ clean:
 	@rm -f $(OBJ_DIR)*
 	@rm -f $(BIN_DIR)*
 	@echo "Removed object files and executables..."
+
+start:
+	clear
+	make clean
+	make all
+
+server:
+	clear
+	bin/server
+
+client:
+	clear
+	bin/client
