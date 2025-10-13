@@ -52,7 +52,6 @@ void *threadOp(void *arg){
     if(semaforoId == -1){
         errExit("<Thread> Get semaforo fallita");
     }
-    
     do{
         waitSem(semaforoId);
         receive(threadData->threadId, &msgRead);
@@ -82,7 +81,7 @@ void *threadOp(void *arg){
                 msgWrite.ticketNumber = msgRead.ticketNumber;
                 memcpy(msgWrite.destinationId, serverId, sizeof(uuid_t));
                 memcpy(msgWrite.data, char_hash, sizeof(char_hash));
-                sleep(1);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
+                sleep(20);      // hashinng e troppo veloce , lo rallento un po per vededere se funziona lo scheduling
                 clock_gettime(CLOCK_MONOTONIC, &end);
                 elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000000000.0;
 

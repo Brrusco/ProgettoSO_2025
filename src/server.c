@@ -17,12 +17,16 @@
 #include "threadOp.h"
 
 #define LEN 256
-#define NUM_THREAD 1
+#define NUM_THREAD 2
 
 
 char uuid_str[37];// variabile di appoggio per letture/scritture di uuid
 char path2ServerFIFO [LEN];
 char path2ThreadFIFO [LEN]; 
+struct Message msgRead;
+struct Message msgWrite;
+uuid_t threadId;
+struct ThreadData threadData;
 
 typedef struct clientNode{
     uuid_t clientId;
@@ -310,11 +314,8 @@ int main(int argc, char *argv[]) {
     printf("╚═══════════════════════════════════════╝\n");
     
     uuid_t serverId;
-    uuid_t threadId;
     //uint8_t hash[32];
     char char_hash[65];
-    struct Message msgRead;
-    struct Message msgWrite;
     
     node *head = NULL;
 
@@ -322,7 +323,6 @@ int main(int argc, char *argv[]) {
     clientNode *currentClient;
 
     pthread_t threads[NUM_THREAD];
-    struct ThreadData threadData;
     int threadDisponibili = 0;
     int filesPending = 0;
     char filePath[LEN];
