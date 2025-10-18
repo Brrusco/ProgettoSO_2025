@@ -20,10 +20,10 @@ void send(struct Message *message){
     snprintf(fifoPath, sizeof(fifoPath), "%s%s", baseFIFOpath, uuid_str);
 
     // [2] Apro la FIFO in scrittura
-
-     if(message->messageType !=5 && message->messageType !=105 && message->messageType != 201 && message->messageType != 106){
-        //printf("opening fifo on write : %s \n", fifoPath);
-     }
+    if(message->messageType !=5 && message->messageType !=105 && message->messageType != 201 && message->messageType != 106){
+       //printf("opening fifo on write : %s \n", fifoPath);
+    }
+    
     int fifoPointer = open(fifoPath, O_WRONLY);
     if (fifoPointer == -1) {
         printf("[MSG ERROR] errore in openWrite fifo : %s", fifoPath);

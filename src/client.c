@@ -284,8 +284,6 @@ int main(int argc, char *argv[]) {
         }
     }
    
-    if (unlink(path2ClientFIFO) != 0)
-        errExit("unlink clientFIFO failed");
-
+    cleanup();
     exit(0);
 }
