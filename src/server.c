@@ -49,7 +49,6 @@ typedef struct node {
 
 void addClient(clientNode **clientHead, uuid_t clientId){
     if (*clientHead != NULL && uuid_compare((*clientHead)->clientId, clientId) == 0) { // previene l'aggiunta dello stesso client id piu volte nella lista
-        fflush(stdout);
         return;
     }
     clientNode *newNode = malloc(sizeof(clientNode));
@@ -233,20 +232,9 @@ int getTicketById(int ticketNumber, node *head, node *toClone) {  // 0 se succes
     return -1;
 }
 
-int getTicketByWeight(node *head, node *toClone) {
-    // recupera il ticket con peso maggiore
-    node *current = head;
-    long maxWeight = -1;
-    while (current) {
-        if (current->weight > maxWeight) {
-            maxWeight = current->weight;
-            memcpy(toClone, current, sizeof(node));
-        }
-        current = current->next;
-    }
-    return maxWeight == -1 ? -1 : 0;
-}
-
+/**
+ * Restituisce il ticket in attesa con il peso minore
+ */
 int getPendingTicket(node *head,int *ticketNumber, char *filePath){
     node *current = head;
     long minWeight;
@@ -265,29 +253,7 @@ int getPendingTicket(node *head,int *ticketNumber, char *filePath){
         }
         current = current->next;
     }
-    return found; // returno minweight cosi se fallisce mi da il numero negativo
-}
-
-
-void printStatus(node *linkedTicketList) {
-    printf("┌────────┬──────────────────────────────┐\n");
-    printf("│ TICKET │ STATUS\t\t\t│\n");
-    if (linkedTicketList != NULL) {
-        printf("├────────┴──────────────┬───────────────┤\n");
-    }
-    for(node *curr = linkedTicketList; curr != NULL; curr = curr->next) {
-        printf("│ ◈ Ticket ID: %d\t│ %s\t│\n", curr->ticketNumber, curr->status == 0 ? "In coda" : curr->status == 1 ? "In calcolo" : "Completato");
-        if (curr->next != NULL) {
-            printf("├───────────────────────┴───────────────┤\n");
-        } else {
-            printf("└───────────────────────┴───────────────┘\n");
-        }
-    }
-    if (linkedTicketList == NULL) {
-        printf("├────────┴──────────────────────────────┤\n");
-        printf("│ ◈ Nessun file in elaborazione\t\t│\n");
-        printf("└───────────────────────────────────────┘\n");
-    }
+    return found; // 0 se non trovato , 1 se trovato
 }
 
 void cleanup(){
@@ -314,11 +280,9 @@ int main(int argc, char *argv[]) {
     printf("╚═══════════════════════════════════════╝\n");
     
     uuid_t serverId;
-    //uint8_t hash[32];
     char char_hash[65];
     
     node *head = NULL;
-
     node *clonedNode = malloc(sizeof(node));
     clientNode *currentClient;
 
@@ -354,7 +318,6 @@ int main(int argc, char *argv[]) {
     
 
     // [02] inizializzazione dei thread
-    
     uuid_generate(threadId);
     uuid_unparse(threadId, uuid_str);
     snprintf(path2ThreadFIFO, sizeof(path2ThreadFIFO), "%s%s", baseFIFOpath, uuid_str);
@@ -372,14 +335,12 @@ int main(int argc, char *argv[]) {
     
     memcpy(threadData.threadId, threadId, sizeof(uuid_t));
     for (int i = 0; i < NUM_THREAD; i++) {
-        // Create the thread and execute the calculateSum function
         if (pthread_create(&threads[i], NULL, threadOp, (void *)&threadData) != 0) {
             errExit("Error creating thread");
         }
-        receive(serverId,&msgRead);
+        receive(serverId, &msgRead);
         if(msgRead.messageType == 201 && msgRead.status == 200){
             threadDisponibili++;
-            fflush(stdout);
         }else{
             errExit("Errore nella ricezione messaggio dal thread");
         }
@@ -389,7 +350,10 @@ int main(int argc, char *argv[]) {
         receive(serverId, &msgRead);
 
         switch (msgRead.messageType) {
-            //messaggi client -> server
+
+            // ---
+            // MSG CLIENT -> SERVER
+            // ---
             case 1:                                        // 1: Client filePathRequest        // assegna al server il path del file su cui calcolare SHA
                 int ticketGiven;
                 int result = addFileInQueue(&head, &ticketCounterSystem, msgRead.data, msgRead.senderId, char_hash, &ticketGiven);
@@ -470,7 +434,10 @@ int main(int argc, char *argv[]) {
                 send(&msgWrite);
 
                 break;
-            //messaggi thread -> server
+            
+            // ---
+            // MSG THREAD -> SERVER
+            // ---
             case 202:                                                                       // thread conferma presa in carico lavoro
                 setFileInProgress(head, msgRead.ticketNumber);
                 threadDisponibili--;
