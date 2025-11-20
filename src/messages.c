@@ -138,7 +138,7 @@ void receive(uuid_t idFifo, struct Message *msg){
         printf("│ DATA: %-64s │\n", msg->data);
         printf("└────────────────────────────────────────────────────────────────────────┘\n");
     }else{
-        printf(">MSG %d\n", msg->messageType);
+        //printf("[DEBUG]>MSG %d\n", msg->messageType);
     }
     fflush(stdout);
    
